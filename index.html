@@ -248,19 +248,23 @@
             <button class="btn primary" onclick="collectData()" id="collectBtn">
                 Собрать данные
             </button>
-            <select id="historyDays" style="padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px 0 0 8px;color:var(--text);font-size:14px;border-right:none;">
-                <option value="0" selected>Все посты</option>
-                <option value="30">30 дней</option>
+            <select id="historyDays" onchange="toggleCustomDays()" style="padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px 0 0 8px;color:var(--text);font-size:14px;border-right:none;">
+                <option value="7">7 дней</option>
+                <option value="14">14 дней</option>
+                <option value="30" selected>30 дней</option>
                 <option value="60">60 дней</option>
                 <option value="90">90 дней</option>
                 <option value="180">180 дней</option>
                 <option value="365">365 дней</option>
+                <option value="0">Все посты</option>
+                <option value="custom">Своё значение...</option>
             </select>
+            <input id="customDays" type="number" min="1" max="999" placeholder="дней" style="display:none;width:70px;padding:10px 8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:14px;border-right:none;">
             <button class="btn" onclick="collectHistory()" id="historyBtn" style="border-radius:0 8px 8px 0;">
                 Загрузить историю
             </button>
-            <a class="btn" href="/api/export/csv?days=90" target="_blank">CSV экспорт</a>
-            <a class="btn" href="/api/export/report?days=7" target="_blank">Отчёт .md</a>
+            <a class="btn" id="csvLink" href="/api/export/csv?days=30" target="_blank">CSV экспорт</a>
+            <a class="btn" id="reportLink" href="/api/export/report?days=7" target="_blank">Отчёт .md</a>
         </div>
     </header>
 
@@ -477,6 +481,26 @@ async function collectData() {
     }
 }
 
+function toggleCustomDays() {
+    const sel = document.getElementById('historyDays');
+    const inp = document.getElementById('customDays');
+    inp.style.display = sel.value === 'custom' ? 'inline-block' : 'none';
+    if (sel.value !== 'custom') {
+        const d = parseInt(sel.value) || 30;
+        document.getElementById('csvLink').href = '/api/export/csv?days=' + (d || 90);
+        document.getElementById('reportLink').href = '/api/export/report?days=' + (d || 7);
+    }
+}
+
+function getSelectedDays() {
+    const sel = document.getElementById('historyDays');
+    if (sel.value === 'custom') {
+        const v = parseInt(document.getElementById('customDays').value);
+        return isNaN(v) || v < 1 ? null : v;
+    }
+    return parseInt(sel.value);
+}
+
 async function scrapeFromBrowser(channel, days) {
     const clean = channel.replace('@', '');
     const allPosts = [];
@@ -516,7 +540,8 @@ async function scrapeFromBrowser(channel, days) {
 }
 
 async function collectHistory() {
-    const days = parseInt(document.getElementById('historyDays').value);
+    const days = getSelectedDays();
+    if (days === null) { alert('Введите количество дней (от 1 до 999)'); return; }
     const btn = document.getElementById('historyBtn');
     btn.disabled = true;
     const label = days === 0 ? 'всех постов' : days + ' дн';
