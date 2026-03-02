@@ -128,7 +128,6 @@
             </select>
             <input id="customDays" type="number" min="1" max="999" placeholder="дн" style="display:none;">
             <button class="btn primary" onclick="collectAll()" id="collectBtn">Обновить данные</button>
-            <a class="btn" href="/strategy" style="background:#6c5ce720;border-color:#6c5ce750;">📋 Стратегия</a>
             <a class="btn" id="csvLink" href="/api/export/csv?days=30" target="_blank">CSV</a>
             <a class="btn" id="reportLink" href="/api/export/report?days=30" target="_blank">Отчёт</a>
         </div>
@@ -177,6 +176,7 @@
         <div class="tab active" data-tab="posts">Посты</div>
         <div class="tab" data-tab="analysis">GPT-анализ</div>
         <div class="tab" data-tab="history">История анализов</div>
+        <div class="tab" data-tab="strategy" onclick="loadStrategyTab()">📋 Стратегия</div>
     </div>
 
     <!-- Posts tab -->
@@ -232,6 +232,54 @@
         <div class="section">
             <h2>История анализов</h2>
             <div id="analysisHistory"><div class="empty-state"><p>Анализы ещё не проводились.</p></div></div>
+        </div>
+    </div>
+
+    <!-- Strategy tab -->
+    <div class="tab-content" id="tab-strategy">
+        <div class="section">
+            <div class="strat-tabs" style="display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--border);">
+                <div class="strat-tab active" data-strat="overview" style="padding:8px 16px;cursor:pointer;font-size:14px;color:var(--accent2);border-bottom:2px solid var(--accent);">Обзор</div>
+                <div class="strat-tab" data-strat="full" style="padding:8px 16px;cursor:pointer;font-size:14px;color:var(--text2);border-bottom:2px solid transparent;">Стратегия</div>
+                <div class="strat-tab" data-strat="audit" style="padding:8px 16px;cursor:pointer;font-size:14px;color:var(--text2);border-bottom:2px solid transparent;">Аудит канала</div>
+            </div>
+
+            <div id="strat-overview" class="strat-section">
+                <div class="kpi-grid" style="margin-bottom:20px;">
+                    <div class="kpi"><div class="label">Падение охвата</div><div class="value" style="color:var(--red);">−76%</div><div class="delta" style="color:var(--text2);">за 4 мес (нояб → фев)</div></div>
+                    <div class="kpi"><div class="label">Подписчики</div><div class="value" style="color:var(--orange);">1 100</div><div class="delta" style="color:var(--text2);">цель: 1 400 за 3 мес</div></div>
+                    <div class="kpi"><div class="label">Контент-дисбаланс</div><div class="value" style="color:var(--blue);">75%</div><div class="delta" style="color:var(--text2);">историй vs 6% карьеры</div></div>
+                    <div class="kpi"><div class="label">Новая частота</div><div class="value" style="color:var(--green);">3/нед</div><div class="delta" style="color:var(--text2);">пн · ср · пт в 10:00</div></div>
+                    <div class="kpi"><div class="label">Целевой микс</div><div class="value" style="color:var(--accent2);">30/30/20</div><div class="delta" style="color:var(--text2);">вакансии/карьера/истории</div></div>
+                </div>
+                <div class="analysis-content">
+                    <h2>Ключевой диагноз</h2>
+                    <p>Канал <strong>@mostcareer</strong> с названием «MOST career» на <strong>75% состоит из историй про индустрию гемблинга</strong> (скандалы, мафия, казино), а не про карьеру. Целевая аудитория — соискатели и пассивные специалисты — не получают то, зачем подписались.</p>
+                    <h2>Главные проблемы</h2>
+                    <ul>
+                        <li><strong>Контент не соответствует ожиданиям ЦА.</strong> Подписчик пришёл за карьерой — получает историю про мафию на Мальте</li>
+                        <li><strong>5 постов/неделю при 1100 подписчиках — перегрузка.</strong> Подписчик видит 5 непрочитанных → не открывает ни один → Telegram понижает приоритет</li>
+                        <li><strong>Нет разнообразия форматов.</strong> Почти все посты — длинные тексты. Нет опросов, визуалов, коротких форматов</li>
+                        <li><strong>Серийный контент (3-4 части)</strong> растягивает аудиторию: кто пропустил часть 1 — не откроет остальные</li>
+                    </ul>
+                    <h2>Стратегия в 4 шага</h2>
+                    <ol>
+                        <li><strong>Снизить частоту до 3 постов/неделю</strong> (пн/ср/пт в 10:00)</li>
+                        <li><strong>Перебалансировать контент:</strong> 30% вакансий + 30% карьера + 20% истории + 10% анонсы + 10% интерактив</li>
+                        <li><strong>Добавить CTA</strong> в каждый пост: отклик / переслать / опрос</li>
+                        <li><strong>Рост подписчиков:</strong> cross-posting, виральный контент, SEO в Telegram, бот как воронка</li>
+                    </ol>
+                    <p style="margin-top:16px;color:var(--text2);">Подробнее — на вкладках «Стратегия» и «Аудит канала».</p>
+                </div>
+            </div>
+
+            <div id="strat-full" class="strat-section" style="display:none;">
+                <div class="analysis-content" id="strategyMd"><div class="empty-state"><span class="loader"></span><br>Загрузка стратегии...</div></div>
+            </div>
+
+            <div id="strat-audit" class="strat-section" style="display:none;">
+                <div class="analysis-content" id="auditMd"><div class="empty-state"><span class="loader"></span><br>Загрузка аудита...</div></div>
+            </div>
         </div>
     </div>
 </div>
@@ -575,6 +623,30 @@ async function showAnalysis(id) {
         }
     } catch(e) { console.error(e); }
 }
+
+let strategyLoaded = false;
+async function loadStrategyTab() {
+    if (strategyLoaded) return;
+    strategyLoaded = true;
+    try {
+        const data = await api('/api/strategy');
+        if (data.strategy) document.getElementById('strategyMd').innerHTML = marked.parse(data.strategy);
+        else document.getElementById('strategyMd').innerHTML = '<div class="empty-state">Стратегия ещё не создана.</div>';
+        if (data.audit) document.getElementById('auditMd').innerHTML = marked.parse(data.audit);
+        else document.getElementById('auditMd').innerHTML = '<div class="empty-state">Аудит ещё не проведён.</div>';
+    } catch(e) {
+        document.getElementById('strategyMd').innerHTML = '<div style="color:var(--red);">Ошибка: '+e.message+'</div>';
+    }
+}
+
+document.querySelectorAll('.strat-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.strat-tab').forEach(t => { t.classList.remove('active'); t.style.color='var(--text2)'; t.style.borderBottomColor='transparent'; });
+        document.querySelectorAll('.strat-section').forEach(s => s.style.display='none');
+        tab.classList.add('active'); tab.style.color='var(--accent2)'; tab.style.borderBottomColor='var(--accent)';
+        document.getElementById('strat-'+tab.dataset.strat).style.display='block';
+    });
+});
 </script>
 </body>
 </html>
