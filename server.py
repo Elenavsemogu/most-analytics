@@ -230,38 +230,89 @@ async def collect_data():
     }
 
 
-@app.post("/api/collect-history", dependencies=[Depends(check_auth)])
-async def collect_history(days: int = Query(90)):
-    """Собрать все посты за последние N дней + текущий снэпшот."""
-    channel_info = await tgstat_request("channels/get")
-    channel_stat = await tgstat_request("channels/stat")
+import re as _re
 
-    now = int(time.time())
+def _parse_views(text: str) -> int:
+    text = text.strip().replace("\xa0", "").replace(" ", "")
+    if text.endswith("K"):
+        return int(float(text[:-1]) * 1000)
+    if text.endswith("M"):
+        return int(float(text[:-1]) * 1_000_000)
+    try:
+        return int(text)
+    except ValueError:
+        return 0
+
+
+async def _scrape_telegram_channel(username: str, max_pages: int = 30):
+    """Scrape public Telegram channel page for all posts with views/dates."""
+    clean = username.lstrip("@")
     all_posts = []
+    before = None
 
-    batch_days = 30
-    for offset_start in range(0, days, batch_days):
-        end_ts = now - offset_start * 86400
-        start_ts = now - min(offset_start + batch_days, days) * 86400
-        try:
-            batch = await tgstat_request("channels/posts", {
-                "startTime": str(start_ts),
-                "endTime": str(end_ts),
-                "limit": "50"
-            })
-            items = batch if isinstance(batch, list) else batch.get("items", [])
-            all_posts.extend(items)
-        except Exception:
-            pass
-        await asyncio.sleep(1)
+    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+        for _ in range(max_pages):
+            url = f"https://t.me/s/{clean}"
+            if before:
+                url += f"?before={before}"
+            resp = await client.get(url)
+            html = resp.text
 
-    seen = set()
-    unique_posts = []
-    for p in all_posts:
-        pid = p.get("id") or p.get("link", "")
-        if pid not in seen:
-            seen.add(pid)
-            unique_posts.append(p)
+            post_ids = _re.findall(rf'data-post="{clean}/(\d+)"', html)
+            if not post_ids:
+                break
+
+            dates = _re.findall(r'datetime="([^"]+)"', html)
+            views_raw = _re.findall(
+                r'class="tgme_widget_message_views"[^>]*>([^<]+)', html
+            )
+            texts_raw = _re.findall(
+                r'class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>',
+                html, _re.DOTALL
+            )
+
+            for i, pid in enumerate(post_ids):
+                view_val = _parse_views(views_raw[i]) if i < len(views_raw) else 0
+                date_val = dates[i] if i < len(dates) else ""
+                raw_text = texts_raw[i] if i < len(texts_raw) else ""
+                clean_text = _re.sub(r"<[^>]+>", " ", raw_text).strip()[:500]
+                all_posts.append({
+                    "post_id": pid,
+                    "link": f"https://t.me/{clean}/{pid}",
+                    "date": date_val,
+                    "views": view_val,
+                    "text": clean_text,
+                })
+
+            before = min(int(p) for p in post_ids)
+            if before <= 1:
+                break
+            await asyncio.sleep(0.5)
+
+    return all_posts
+
+
+@app.post("/api/collect-history", dependencies=[Depends(check_auth)])
+async def collect_history(days: int = Query(0)):
+    """Загрузить все посты из публичной страницы Telegram-канала.
+    days=0 означает «все посты», иначе — за последние N дней."""
+    channel_stat = await tgstat_request("channels/stat")
+    channel_info = await tgstat_request("channels/get")
+
+    all_posts = await _scrape_telegram_channel(CHANNEL_ID)
+
+    if days > 0:
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        filtered = []
+        for p in all_posts:
+            try:
+                dt = datetime.fromisoformat(p["date"].replace("+00:00", "+00:00").replace("Z", "+00:00"))
+                dt = dt.replace(tzinfo=None)
+                if dt >= cutoff:
+                    filtered.append(p)
+            except Exception:
+                filtered.append(p)
+        all_posts = filtered
 
     collected_at = datetime.utcnow().isoformat()
     with get_db() as conn:
@@ -276,37 +327,29 @@ async def collect_history(days: int = Query(90)):
             channel_stat.get("err_percent", 0),
             channel_stat.get("daily_reach", 0),
             channel_stat.get("ci_index", 0),
-            len(unique_posts),
+            len(all_posts),
             channel_info.get("title", "MOST"),
             "{}"
         ))
         snapshot_id = cur.lastrowid
 
-        for p in unique_posts:
-            post_id = p.get("id") or hashlib.md5(
-                (p.get("link", "") + str(p.get("date", ""))).encode()
-            ).hexdigest()
-            date_val = p.get("date", "")
-            if isinstance(date_val, (int, float)):
-                date_val = datetime.utcfromtimestamp(date_val).isoformat()
+        for p in all_posts:
             conn.execute("""
                 INSERT OR REPLACE INTO posts
                     (post_id, snapshot_id, date, text, views, forwards, reactions, shares, link)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                str(post_id), snapshot_id, date_val,
-                (p.get("text") or "")[:500],
-                p.get("views", 0),
-                p.get("forwards_count", p.get("forwards", 0)),
-                p.get("reactions_count", 0),
-                p.get("shares_count", p.get("shares", 0)),
-                p.get("link", "")
+                str(p["post_id"]), snapshot_id, p["date"],
+                p["text"],
+                p["views"],
+                0, 0, 0,
+                p["link"]
             ))
 
     return {
         "status": "ok",
-        "days_collected": days,
-        "posts_collected": len(unique_posts),
+        "days_collected": days if days > 0 else "all",
+        "posts_collected": len(all_posts),
         "snapshot_id": snapshot_id
     }
 

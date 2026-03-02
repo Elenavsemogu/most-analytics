@@ -249,9 +249,10 @@
                 Собрать данные
             </button>
             <select id="historyDays" style="padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px 0 0 8px;color:var(--text);font-size:14px;border-right:none;">
+                <option value="0" selected>Все посты</option>
                 <option value="30">30 дней</option>
                 <option value="60">60 дней</option>
-                <option value="90" selected>90 дней</option>
+                <option value="90">90 дней</option>
                 <option value="180">180 дней</option>
                 <option value="365">365 дней</option>
             </select>
@@ -480,7 +481,8 @@ async function collectHistory() {
     const days = document.getElementById('historyDays').value;
     const btn = document.getElementById('historyBtn');
     btn.disabled = true;
-    btn.innerHTML = '<span class="loader"></span> Загрузка ' + days + ' дн...';
+    const label = days === '0' ? 'всех постов' : days + ' дн';
+    btn.innerHTML = '<span class="loader"></span> Загрузка ' + label + '...';
     try {
         const res = await api('/api/collect-history?days=' + days, { method: 'POST' });
         btn.innerHTML = `Готово! ${res.posts_collected} постов`;
