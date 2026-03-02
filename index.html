@@ -128,6 +128,7 @@
             </select>
             <input id="customDays" type="number" min="1" max="999" placeholder="дн" style="display:none;">
             <button class="btn primary" onclick="collectAll()" id="collectBtn">Обновить данные</button>
+            <a class="btn" href="/strategy" style="background:#6c5ce720;border-color:#6c5ce750;">📋 Стратегия</a>
             <a class="btn" id="csvLink" href="/api/export/csv?days=30" target="_blank">CSV</a>
             <a class="btn" id="reportLink" href="/api/export/report?days=30" target="_blank">Отчёт</a>
         </div>
@@ -150,12 +151,18 @@
         <div class="kpi"><div class="label">Упоминаний</div><div class="value" id="kMentions">—</div><div class="delta" id="kMentionsD"></div></div>
     </div>
 
-    <!-- Main charts (TGStat-style) -->
+    <!-- Main charts — from post data (historical) -->
     <div class="charts-grid">
-        <div class="chart-box"><h3>Подписчики</h3><div class="chart-wrap"><canvas id="cSubs"></canvas></div></div>
-        <div class="chart-box"><h3>Средний охват поста</h3><div class="chart-wrap"><canvas id="cReach"></canvas></div></div>
-        <div class="chart-box"><h3>ERR %</h3><div class="chart-wrap"><canvas id="cERR"></canvas></div></div>
-        <div class="chart-box"><h3>Просмотры за день</h3><div class="chart-wrap"><canvas id="cViews"></canvas></div></div>
+        <div class="chart-box"><h3>📈 Просмотры по неделям</h3><div class="chart-wrap"><canvas id="cWeeklyViews"></canvas></div></div>
+        <div class="chart-box"><h3>📊 Средний охват по неделям</h3><div class="chart-wrap"><canvas id="cWeeklyReach"></canvas></div></div>
+        <div class="chart-box"><h3>📝 Постов в неделю</h3><div class="chart-wrap"><canvas id="cWeeklyPosts"></canvas></div></div>
+        <div class="chart-box"><h3>📅 Просмотры по месяцам</h3><div class="chart-wrap"><canvas id="cMonthlyViews"></canvas></div></div>
+    </div>
+
+    <!-- Snapshot-based charts (accumulate from cron) -->
+    <div class="charts-grid" id="snapshotCharts" style="display:none;">
+        <div class="chart-box"><h3>Подписчики (ежедн.)</h3><div class="chart-wrap"><canvas id="cSubs"></canvas></div></div>
+        <div class="chart-box"><h3>ERR % (ежедн.)</h3><div class="chart-wrap"><canvas id="cERR"></canvas></div></div>
     </div>
 
     <!-- Smart charts -->
@@ -247,6 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
     checkHealth();
     loadSnapshots();
     loadMetrics();
+    loadPostTimeline();
     loadPosts();
     loadSmartCharts();
     loadAnalysisHistory();
@@ -361,7 +369,7 @@ async function collectAll() {
     if (!parts.length) parts.push('нет данных');
     btn.innerHTML = parts.join(' + ');
     setTimeout(() => { btn.innerHTML = 'Обновить данные'; btn.disabled = false; }, 3500);
-    checkHealth(); loadSnapshots(); loadMetrics(); loadPosts(); loadSmartCharts();
+    checkHealth(); loadSnapshots(); loadMetrics(); loadPostTimeline(); loadPosts(); loadSmartCharts();
 }
 
 async function loadSnapshots() {
@@ -392,18 +400,50 @@ function setKPI(id, val, prev, sfx = '') {
 async function loadMetrics() {
     try {
         const data = await api('/api/metrics');
-        if (!data.length) return;
+        if (data.length < 2) { document.getElementById('snapshotCharts').style.display = 'none'; return; }
+        document.getElementById('snapshotCharts').style.display = 'grid';
         const labels = data.map(d => new Date(d.collected_at).toLocaleDateString('ru-RU', {day:'numeric',month:'short'}));
         mkChart('cSubs', labels, data.map(d => d.participants), '#6c5ce7');
-        mkChart('cReach', labels, data.map(d => d.avg_reach), '#74b9ff');
         mkChart('cERR', labels, data.map(d => d.err_percent), '#00b894');
-        mkChart('cViews', labels, data.map(d => d.daily_reach), '#fdcb6e', 'bar');
     } catch(e) { console.error(e); }
 }
-function mkChart(id, labels, values, color, type='line') {
+
+async function loadPostTimeline() {
+    try {
+        const data = await api('/api/posts-timeline');
+        if (!data.weekly || !data.weekly.length) return;
+        const w = data.weekly;
+        const wLabels = w.map(d => {
+            const parts = d.week.split('-W');
+            return 'W' + parts[1];
+        });
+        mkChart('cWeeklyViews', wLabels, w.map(d => d.total_views), '#6c5ce7', 'bar');
+        mkChart('cWeeklyReach', wLabels, w.map(d => d.avg_views), '#74b9ff');
+        mkChart('cWeeklyPosts', wLabels, w.map(d => d.posts_count), '#00b894', 'bar');
+
+        if (data.monthly && data.monthly.length) {
+            const m = data.monthly;
+            const monthNames = {
+                '01':'Янв','02':'Фев','03':'Мар','04':'Апр','05':'Май','06':'Июн',
+                '07':'Июл','08':'Авг','09':'Сен','10':'Окт','11':'Ноя','12':'Дек'
+            };
+            const mLabels = m.map(d => {
+                const [y, mo] = d.month.split('-');
+                return (monthNames[mo]||mo) + ' ' + y.slice(2);
+            });
+            const mColors = m.map(d => {
+                const avg = d.avg_views;
+                return avg > 800 ? '#00b89488' : avg > 400 ? '#fdcb6e88' : '#e1705588';
+            });
+            mkChart('cMonthlyViews', mLabels, m.map(d => d.total_views), '#a29bfe', 'bar', mColors);
+        }
+    } catch(e) { console.error('postTimeline:', e); }
+}
+function mkChart(id, labels, values, color, type='line', customColors=null) {
     if (charts[id]) charts[id].destroy();
+    const bgColor = customColors || (type==='bar' ? color+'88' : color+'20');
     charts[id] = new Chart(document.getElementById(id).getContext('2d'), {
-        type, data: { labels, datasets: [{ data: values, borderColor: color, backgroundColor: type==='bar' ? color+'88' : color+'20', fill: type==='line' }] }, options: chartOpts
+        type, data: { labels, datasets: [{ data: values, borderColor: color, backgroundColor: bgColor, fill: type==='line' }] }, options: chartOpts
     });
 }
 

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MOST — Стратегия и Аудит</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #0f1117; --surface: #1a1d27; --surface2: #232736; --border: #2e3348;
+            --text: #e1e4ed; --text2: #8b90a5; --accent: #6c5ce7; --accent2: #a29bfe;
+            --green: #00b894; --red: #e17055; --orange: #fdcb6e; --blue: #74b9ff;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }
+
+        .top-bar { position: sticky; top: 0; z-index: 100; background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 0; backdrop-filter: blur(12px); background: rgba(26,29,39,0.92); }
+        .top-bar-inner { max-width: 860px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; }
+        .top-bar h1 { font-size: 18px; font-weight: 700; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .top-bar a { color: var(--accent2); text-decoration: none; font-size: 14px; display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 8px; transition: all 0.2s; }
+        .top-bar a:hover { border-color: var(--accent); background: var(--surface2); }
+
+        .tabs-bar { max-width: 860px; margin: 24px auto 0; padding: 0 24px; display: flex; gap: 4px; border-bottom: 1px solid var(--border); }
+        .stab { padding: 10px 20px; cursor: pointer; font-size: 15px; color: var(--text2); border-bottom: 2px solid transparent; transition: all 0.2s; font-weight: 500; }
+        .stab.active { color: var(--accent2); border-bottom-color: var(--accent); }
+        .stab:hover { color: var(--text); }
+
+        .content { max-width: 860px; margin: 0 auto; padding: 32px 24px 80px; }
+        .content-section { display: none; }
+        .content-section.active { display: block; }
+
+        .md { color: var(--text); }
+        .md h1 { font-size: 28px; font-weight: 700; margin: 36px 0 16px; color: #fff; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+        .md h1:first-child { margin-top: 0; }
+        .md h2 { font-size: 22px; font-weight: 600; margin: 32px 0 14px; color: var(--accent2); }
+        .md h3 { font-size: 17px; font-weight: 600; margin: 24px 0 10px; color: var(--text); }
+        .md h4 { font-size: 15px; font-weight: 600; margin: 20px 0 8px; color: var(--text2); }
+        .md p { margin-bottom: 14px; color: var(--text); }
+        .md ul, .md ol { margin: 0 0 16px 24px; }
+        .md li { margin-bottom: 6px; }
+        .md strong { color: #fff; }
+        .md em { color: var(--accent2); font-style: normal; }
+        .md blockquote { border-left: 3px solid var(--accent); padding: 12px 20px; margin: 16px 0; background: var(--surface); border-radius: 0 8px 8px 0; color: var(--text2); font-size: 15px; }
+        .md blockquote p { margin-bottom: 4px; }
+        .md hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+        .md table { width: 100%; border-collapse: collapse; margin: 16px 0; background: var(--surface); border-radius: 8px; overflow: hidden; }
+        .md thead { background: var(--surface2); }
+        .md th { text-align: left; padding: 10px 14px; font-size: 12px; text-transform: uppercase; color: var(--text2); font-weight: 600; letter-spacing: 0.3px; }
+        .md td { padding: 10px 14px; border-top: 1px solid var(--border); font-size: 14px; }
+        .md tr:hover td { background: var(--surface2); }
+        .md code { background: var(--surface2); padding: 2px 8px; border-radius: 4px; font-size: 13px; color: var(--accent2); }
+        .md pre { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin: 16px 0; overflow-x: auto; }
+        .md pre code { background: none; padding: 0; color: var(--text); }
+
+        .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 24px 0; }
+        .summary-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+        .summary-card .sc-label { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .summary-card .sc-value { font-size: 26px; font-weight: 700; }
+        .summary-card .sc-note { font-size: 12px; color: var(--text2); margin-top: 4px; }
+        .sc-red .sc-value { color: var(--red); }
+        .sc-green .sc-value { color: var(--green); }
+        .sc-blue .sc-value { color: var(--blue); }
+        .sc-orange .sc-value { color: var(--orange); }
+        .sc-accent .sc-value { color: var(--accent2); }
+
+        .loader-wrap { text-align: center; padding: 60px; color: var(--text2); }
+        .loader { display: inline-block; width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 600px) {
+            .md h1 { font-size: 22px; }
+            .md h2 { font-size: 18px; }
+            .summary-cards { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <div class="top-bar-inner">
+            <h1>MOST — Стратегия</h1>
+            <a href="/">← Дашборд</a>
+        </div>
+    </div>
+
+    <div class="tabs-bar">
+        <div class="stab active" data-section="overview">Обзор</div>
+        <div class="stab" data-section="strategy">Стратегия</div>
+        <div class="stab" data-section="audit">Аудит канала</div>
+    </div>
+
+    <div class="content">
+        <!-- Overview -->
+        <div class="content-section active" id="sec-overview">
+            <div class="summary-cards">
+                <div class="summary-card sc-red">
+                    <div class="sc-label">Падение охвата</div>
+                    <div class="sc-value">−76%</div>
+                    <div class="sc-note">за 4 месяца (нояб → фев)</div>
+                </div>
+                <div class="summary-card sc-orange">
+                    <div class="sc-label">Подписчики</div>
+                    <div class="sc-value">1 100</div>
+                    <div class="sc-note">цель: 1 400 за 3 мес</div>
+                </div>
+                <div class="summary-card sc-blue">
+                    <div class="sc-label">Контент-дисбаланс</div>
+                    <div class="sc-value">75%</div>
+                    <div class="sc-note">историй vs 6% карьеры</div>
+                </div>
+                <div class="summary-card sc-green">
+                    <div class="sc-label">Новая частота</div>
+                    <div class="sc-value">3/нед</div>
+                    <div class="sc-note">пн · ср · пт в 10:00</div>
+                </div>
+                <div class="summary-card sc-accent">
+                    <div class="sc-label">Целевой микс</div>
+                    <div class="sc-value">30/30/20</div>
+                    <div class="sc-note">вакансии / карьера / истории</div>
+                </div>
+            </div>
+
+            <div class="md">
+                <h2>Ключевой диагноз</h2>
+                <p>Канал <strong>@mostcareer</strong> с названием «MOST career» на <strong>75% состоит из историй про индустрию гемблинга</strong> (скандалы, мафия, казино), а не про карьеру. Целевая аудитория — соискатели и пассивные специалисты — не получают то, зачем подписались.</p>
+
+                <h2>Главные проблемы</h2>
+                <ul>
+                    <li><strong>Контент не соответствует ожиданиям ЦА.</strong> Подписчик пришёл за карьерой — получает историю про мафию на Мальте</li>
+                    <li><strong>5 постов/неделю при 1100 подписчиках — перегрузка.</strong> Подписчик видит 5 непрочитанных → не открывает ни один → Telegram понижает приоритет</li>
+                    <li><strong>Нет разнообразия форматов.</strong> Почти все посты — длинные тексты. Нет опросов, визуалов, коротких форматов</li>
+                    <li><strong>Серийный контент (3-4 части)</strong> растягивает аудиторию: кто пропустил часть 1 — не откроет остальные</li>
+                </ul>
+
+                <h2>Стратегия в 4 шага</h2>
+                <ol>
+                    <li><strong>Снизить частоту до 3 постов/неделю</strong> (пн/ср/пт в 10:00)</li>
+                    <li><strong>Перебалансировать контент:</strong> 30% вакансий + 30% карьера + 20% истории + 10% анонсы + 10% интерактив</li>
+                    <li><strong>Добавить CTA</strong> в каждый пост: отклик / переслать / опрос</li>
+                    <li><strong>Рост подписчиков:</strong> cross-posting, виральный контент, SEO в Telegram, бот как воронка</li>
+                </ol>
+                <p style="margin-top:24px;">Подробности — на вкладках <em>Стратегия</em> и <em>Аудит канала</em>.</p>
+            </div>
+        </div>
+
+        <!-- Strategy -->
+        <div class="content-section" id="sec-strategy">
+            <div class="loader-wrap" id="strategyLoader"><div class="loader"></div><br>Загрузка стратегии...</div>
+            <div class="md" id="strategyContent"></div>
+        </div>
+
+        <!-- Audit -->
+        <div class="content-section" id="sec-audit">
+            <div class="loader-wrap" id="auditLoader"><div class="loader"></div><br>Загрузка аудита...</div>
+            <div class="md" id="auditContent"></div>
+        </div>
+    </div>
+
+<script>
+document.querySelectorAll('.stab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.stab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.content-section').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('sec-' + tab.dataset.section).classList.add('active');
+    });
+});
+
+let loaded = false;
+async function loadContent() {
+    if (loaded) return;
+    loaded = true;
+    try {
+        const resp = await fetch('/api/strategy');
+        if (resp.status === 401) { window.location.href = '/login'; return; }
+        const data = await resp.json();
+
+        if (data.strategy) {
+            document.getElementById('strategyContent').innerHTML = marked.parse(data.strategy);
+            document.getElementById('strategyLoader').style.display = 'none';
+        } else {
+            document.getElementById('strategyLoader').innerHTML = '<p>Стратегия ещё не создана.</p>';
+        }
+
+        if (data.audit) {
+            document.getElementById('auditContent').innerHTML = marked.parse(data.audit);
+            document.getElementById('auditLoader').style.display = 'none';
+        } else {
+            document.getElementById('auditLoader').innerHTML = '<p>Аудит ещё не проведён.</p>';
+        }
+    } catch(e) {
+        document.getElementById('strategyLoader').innerHTML = '<p style="color:#e17055;">Ошибка загрузки: ' + e.message + '</p>';
+        document.getElementById('auditLoader').innerHTML = '';
+    }
+}
+
+loadContent();
+</script>
+</body>
+</html>

@@ -155,10 +155,16 @@ def classify_post(text: str) -> str:
 # ── Marketing strategy context for GPT ───────────────────────────────
 
 STRATEGY_FILE = Path(__file__).parent / "marketing-strategy.md"
+AUDIT_FILE = Path(__file__).parent / "channel-audit.md"
 
 def load_strategy() -> str:
     if STRATEGY_FILE.exists():
         return STRATEGY_FILE.read_text(encoding="utf-8")
+    return ""
+
+def load_audit() -> str:
+    if AUDIT_FILE.exists():
+        return AUDIT_FILE.read_text(encoding="utf-8")
     return ""
 
 
@@ -770,6 +776,55 @@ def get_posts_classified(days: int = 30):
     return posts
 
 
+@app.get("/api/posts-timeline", dependencies=[Depends(check_auth)])
+def get_posts_timeline():
+    """Понедельная агрегация постов для графиков (views, reach, count)."""
+    from collections import defaultdict
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT date, views, text FROM posts WHERE date != '' ORDER BY date ASC"
+        ).fetchall()
+
+    weeks = defaultdict(lambda: {"views": 0, "count": 0, "types": defaultdict(int)})
+    months = defaultdict(lambda: {"views": 0, "count": 0})
+
+    for r in rows:
+        try:
+            dt = datetime.fromisoformat(r["date"].replace("+00:00", "").replace("Z", ""))
+            wk = dt.strftime("%Y-W%W")
+            mo = dt.strftime("%Y-%m")
+            weeks[wk]["views"] += r["views"]
+            weeks[wk]["count"] += 1
+            weeks[wk]["types"][classify_post(r["text"])] += 1
+            months[mo]["views"] += r["views"]
+            months[mo]["count"] += 1
+        except Exception:
+            pass
+
+    weekly = []
+    for wk in sorted(weeks):
+        d = weeks[wk]
+        weekly.append({
+            "week": wk,
+            "total_views": d["views"],
+            "avg_views": round(d["views"] / d["count"]) if d["count"] else 0,
+            "posts_count": d["count"],
+            "types": dict(d["types"]),
+        })
+
+    monthly = []
+    for mo in sorted(months):
+        d = months[mo]
+        monthly.append({
+            "month": mo,
+            "total_views": d["views"],
+            "avg_views": round(d["views"] / d["count"]) if d["count"] else 0,
+            "posts_count": d["count"],
+        })
+
+    return {"weekly": weekly, "monthly": monthly}
+
+
 @app.get("/api/content-mix", dependencies=[Depends(check_auth)])
 def get_content_mix(days: int = 30):
     """Content mix breakdown for charts."""
@@ -901,7 +956,23 @@ def health():
     }
 
 
+# ── Strategy & Audit API ──────────────────────────────────────────────
+
+@app.get("/api/strategy", dependencies=[Depends(check_auth)])
+def get_strategy_content():
+    return {"strategy": load_strategy(), "audit": load_audit()}
+
+
 # ── Serve Frontend ────────────────────────────────────────────────────
+
+@app.get("/strategy")
+def serve_strategy(request: Request):
+    if DASHBOARD_PASSWORD:
+        token = request.cookies.get("session", "")
+        if token not in VALID_TOKENS:
+            return RedirectResponse("/login")
+    return FileResponse(Path(__file__).parent / "strategy.html")
+
 
 @app.get("/")
 def serve_index(request: Request):
