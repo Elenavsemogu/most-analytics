@@ -32,6 +32,8 @@ CRON_SECRET = os.getenv("CRON_SECRET", "mostsecret2026")
 TGSTAT_BASE = "https://api.tgstat.ru"
 DB_PATH = Path(__file__).parent / "analytics.db"
 
+RENDER_URL = os.getenv("RENDER_EXTERNAL_URL", "")
+
 app = FastAPI(title="MOST Analytics")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
@@ -972,6 +974,28 @@ def serve_strategy(request: Request):
         if token not in VALID_TOKENS:
             return RedirectResponse("/login")
     return FileResponse(Path(__file__).parent / "strategy.html")
+
+
+# ── Keep-alive (prevent Render free-tier cold starts) ────────────────
+
+async def _keep_alive_loop():
+    """Ping self every 10 minutes to prevent Render from sleeping."""
+    url = RENDER_URL.rstrip("/") + "/api/health" if RENDER_URL else None
+    if not url:
+        return
+    await asyncio.sleep(60)
+    async with httpx.AsyncClient(timeout=10) as client:
+        while True:
+            try:
+                await client.get(url)
+            except Exception:
+                pass
+            await asyncio.sleep(600)
+
+@app.on_event("startup")
+async def start_keep_alive():
+    if RENDER_URL:
+        asyncio.create_task(_keep_alive_loop())
 
 
 @app.get("/")
