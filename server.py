@@ -28,6 +28,7 @@ TGSTAT_TOKEN = os.getenv("TGSTAT_TOKEN", "")
 CHANNEL_ID = os.getenv("MOST_CHANNEL_ID", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "")
+CRON_SECRET = os.getenv("CRON_SECRET", "mostsecret2026")
 TGSTAT_BASE = "https://api.tgstat.ru"
 DB_PATH = Path(__file__).parent / "analytics.db"
 
@@ -129,6 +130,36 @@ def init_db():
         """)
 
 init_db()
+
+
+# ── Post classifier ──────────────────────────────────────────────────
+
+def classify_post(text: str) -> str:
+    t = text.lower()
+    if any(k in t for k in ['ищем', 'вакансия', 'откликайся', 'откликайтесь', 'отклик:',
+                             'актуальных вакансий', '@daria_hrg', 'задачи:', 'что важно:',
+                             'будет плюсом', 'зарплатный оффер', 'открыта позиция']):
+        return 'vacancy'
+    if any(k in t for k in ['как описать', 'как написать', 'резюме', 'собеседов', 'зарплат',
+                             'карьер', 'gap year', 'рекрутер', 'навык', 'мотивац',
+                             'кто такой', 'сколько платят', 'переговор']):
+        return 'career'
+    if any(k in t for k in ['статья', 'вышла наша', 'читайте', 'подборк', 'дайджест',
+                             'анонс', 'партнёр', 'конференц', 'событи']):
+        return 'announce'
+    if any(k in t for k in ['опрос', 'голосуй', 'quiz', 'квиз']):
+        return 'interactive'
+    return 'story'
+
+
+# ── Marketing strategy context for GPT ───────────────────────────────
+
+STRATEGY_FILE = Path(__file__).parent / "marketing-strategy.md"
+
+def load_strategy() -> str:
+    if STRATEGY_FILE.exists():
+        return STRATEGY_FILE.read_text(encoding="utf-8")
+    return ""
 
 
 # ── TGStat API ────────────────────────────────────────────────────────
@@ -465,15 +496,61 @@ def get_top_posts(days: int = 30, limit: int = 10):
 
 # ── GPT Analysis ──────────────────────────────────────────────────────
 
+def _build_post_summary(posts: list) -> str:
+    from collections import defaultdict
+    weeks = defaultdict(list)
+    for p in posts:
+        try:
+            dt = datetime.fromisoformat(p["date"].replace("+00:00", "").replace("Z", ""))
+            wk = dt.strftime("%Y-W%W")
+        except Exception:
+            wk = "unknown"
+        ptype = classify_post(p.get("text", ""))
+        weeks[wk].append({**p, "type": ptype, "week": wk})
+
+    lines = []
+    all_views = [p["views"] for p in posts if p.get("views")]
+    avg_all = sum(all_views) / len(all_views) if all_views else 0
+    lines.append(f"Всего постов: {len(posts)}, средний охват: {avg_all:.0f}")
+    type_counts = defaultdict(lambda: {"count": 0, "views": 0})
+    for p in posts:
+        t = classify_post(p.get("text", ""))
+        type_counts[t]["count"] += 1
+        type_counts[t]["views"] += p.get("views", 0)
+    lines.append("\nРаспределение по типам:")
+    for t, d in sorted(type_counts.items(), key=lambda x: -x[1]["count"]):
+        avg = d["views"] / d["count"] if d["count"] else 0
+        lines.append(f"  {t}: {d['count']} постов, ср.охват {avg:.0f}")
+
+    lines.append("\nПонедельная динамика:")
+    for wk in sorted(weeks):
+        wp = weeks[wk]
+        avg = sum(p.get("views", 0) for p in wp) / len(wp) if wp else 0
+        types = ", ".join(sorted(set(p["type"] for p in wp)))
+        lines.append(f"  {wk}: {len(wp)} постов, ср.охват {avg:.0f} ({types})")
+
+    lines.append("\nТоп-5 по охвату:")
+    for p in sorted(posts, key=lambda x: x.get("views", 0), reverse=True)[:5]:
+        t = classify_post(p.get("text", ""))
+        lines.append(f"  [{p.get('views',0)} views, {t}] {p.get('text','')[:120]}")
+
+    lines.append("\nАутсайдеры (5 худших):")
+    for p in sorted(posts, key=lambda x: x.get("views", 0))[:5]:
+        t = classify_post(p.get("text", ""))
+        lines.append(f"  [{p.get('views',0)} views, {t}] {p.get('text','')[:120]}")
+
+    return "\n".join(lines)
+
+
 @app.post("/api/analyze", dependencies=[Depends(check_auth)])
 async def run_analysis(days: int = Query(7), depth: str = Query("standard")):
-    """GPT-анализ с историческим контекстом."""
+    """GPT-анализ с привязкой к маркетинговой стратегии."""
     if not OPENAI_API_KEY:
         raise HTTPException(400, "OPENAI_API_KEY не настроен в .env")
 
     with get_db() as conn:
         snapshots = conn.execute(
-            "SELECT * FROM snapshots ORDER BY collected_at DESC LIMIT 12"
+            "SELECT * FROM snapshots ORDER BY collected_at DESC LIMIT 30"
         ).fetchall()
         snapshots = [dict(s) for s in snapshots]
         for s in snapshots:
@@ -483,71 +560,99 @@ async def run_analysis(days: int = Query(7), depth: str = Query("standard")):
         posts = conn.execute("""
             SELECT post_id, date, text, views, forwards, reactions, shares, link
             FROM posts WHERE date >= ?
-            ORDER BY views DESC LIMIT 30
+            ORDER BY date DESC
         """, (cutoff,)).fetchall()
         posts = [dict(p) for p in posts]
 
-        prev_analyses = conn.execute(
-            "SELECT created_at, period_start, period_end, analysis_type FROM analyses "
-            "ORDER BY created_at DESC LIMIT 3"
-        ).fetchall()
-        prev_analyses = [dict(a) for a in prev_analyses]
+    post_summary = _build_post_summary(posts)
 
-    data_context = json.dumps({
-        "snapshots_history": snapshots,
-        "posts_last_period": posts,
-        "analysis_period_days": days,
-        "previous_analyses_count": len(prev_analyses)
-    }, ensure_ascii=False, default=str)
+    snap_summary = ""
+    if snapshots:
+        la = snapshots[0]
+        snap_summary = (
+            f"Подписчики: {la.get('participants', '?')}, "
+            f"Ср.охват: {la.get('avg_reach', '?')}, "
+            f"ERR: {la.get('err_percent', '?')}%, "
+            f"Дневной охват: {la.get('daily_reach', '?')}, "
+            f"CI: {la.get('ci_index', '?')}"
+        )
+        if len(snapshots) > 1:
+            pr = snapshots[-1]
+            snap_summary += (
+                f"\nПредыдущий снимок ({pr.get('collected_at', '?')[:10]}): "
+                f"Подписчики: {pr.get('participants', '?')}, "
+                f"Ср.охват: {pr.get('avg_reach', '?')}"
+            )
 
-    system_prompt = """Ты — старший аналитик Telegram-каналов с глубокой экспертизой в контент-маркетинге и iGaming.
-Ты анализируешь данные канала MOST. У тебя есть доступ к истории снэпшотов (несколько сборов данных) и постам.
+    strategy = load_strategy()
+    strategy_excerpt = strategy[:3000] if strategy else "Стратегия не загружена."
 
-Твои задачи:
-1. Выявить тренды роста/падения подписчиков и охватов
-2. Определить какие посты сработали лучше всего и ПОЧЕМУ (формат, тема, время, длина)
-3. Проанализировать отток и прирост аудитории
-4. Дать конкретные рекомендации: что публиковать, когда, в каком формате
-5. Предложить стратегии привлечения новых подписчиков
-6. Сравнить текущий период с предыдущими (если есть история)
+    system_prompt = f"""Ты — head of growth Telegram-канала @mostcareer (iGaming рекрутинг).
+Ты проводишь аналитику для команды, которая принимает решения по контенту.
 
-Пиши на русском, структурированно, с конкретными цифрами. Используй Markdown."""
+КОНТЕКСТ КАНАЛА:
+- ~1100 подписчиков, цель — привлечь специалистов iGaming (и активных соискателей, и пассивных)
+- Комментарии отключены
+- Индустрия закрытая: нельзя давать конкретные кейсы компаний, цифры из NDA, рецепты по трафику
+
+НАША СТРАТЕГИЯ (следуй ей при оценке):
+{strategy_excerpt}
+
+ПРАВИЛА АНАЛИЗА:
+1. КАЖДЫЙ пост оценивай конкретно: сработал / средне / провалился. Укажи ПОЧЕМУ (тема, формат, время, длина, тип).
+2. Сравнивай охваты по типам контента: vacancy, career, story, announce, interactive.
+3. Привязывай всё к стратегии: контент-микс 30/30/20/10/10 соблюдается? Если нет — скажи прямо.
+4. Подписчики: рост или отток? Что могло повлиять?
+5. НЕ ДАВАЙ поверхностных советов типа «делитесь кейсами», «больше вовлекайте аудиторию», «используйте storytelling». Только конкретные, actionable рекомендации.
+6. Формат: структурированный Markdown, с цифрами и процентами.
+7. В конце — 3 конкретных действия на следующую неделю с днями и темами."""
 
     depth_prompts = {
-        "quick": "Сделай краткий обзор за период: 3-5 ключевых наблюдений и 2-3 рекомендации.",
-        "standard": """Проанализируй данные и сформируй отчёт:
-1. Ключевые метрики и их динамика
-2. Топ-5 постов: почему они сработали (тема, формат, время публикации)
-3. Анализ аудитории: прирост, отток, тренды
-4. Что можно улучшить: конкретные рекомендации по контенту
-5. Стратегии привлечения новых подписчиков
-6. Риски и точки внимания""",
-        "deep": """Сделай углублённый анализ:
-1. Детальная динамика метрик с процентами изменений между периодами
-2. Сегментация контента: какие типы/форматы/темы дают лучший отклик
-3. Анализ лучшего времени публикаций (по дням и часам если видно из дат)
-4. Топ-10 постов с разбором: что именно зацепило аудиторию
-5. Глубокий анализ роста: органика vs вирусность, откуда приходят подписчики
-6. Конкурентные рекомендации: что делают успешные каналы в нише
-7. Прогноз на следующий период
-8. Пошаговый план действий на неделю: что публиковать, когда, в каком формате
-9. Идеи для экспериментов и A/B тестов контента
-10. Стратегия роста на месяц: как найти 500+ новых подписчиков"""
+        "standard": f"""Проведи анализ канала за последние {days} дней.
+
+ТЕКУЩИЕ МЕТРИКИ: {snap_summary}
+
+ДАННЫЕ ПО ПОСТАМ:
+{post_summary}
+
+Структура отчёта:
+1. **Вердикт** — одно предложение: канал растёт / стагнирует / падает?
+2. **Метрики** — подписчики, охват, ERR: динамика с цифрами
+3. **Контент-микс** — фактическое соотношение типов vs стратегия (30/30/20/10/10)
+4. **Топ-3 и антитоп-3** — конкретные посты с разбором: почему сработал / провалился
+5. **Соответствие стратегии** — что соблюдается, что нет
+6. **Рекомендации** — 3-5 конкретных шагов (день, формат, тема)""",
+
+        "deep": f"""Проведи глубокий анализ канала за последние {days} дней. Это стратегический отчёт для принятия решений.
+
+ТЕКУЩИЕ МЕТРИКИ: {snap_summary}
+
+ДАННЫЕ ПО ПОСТАМ:
+{post_summary}
+
+Структура:
+1. **Executive summary** — 3 предложения: состояние канала, главная проблема, главная возможность
+2. **Динамика метрик** — понедельный тренд охватов, сравнение с предыдущим периодом, % изменений
+3. **Аудит контент-микса** — таблица: тип / кол-во / доля / ср.охват / vs стратегия
+4. **Разбор каждого поста** — таблица: дата / тип / охват / vs среднее / вердикт (1-2 слова почему)
+5. **Анализ времени** — какие дни и часы дают лучший результат
+6. **Подписчики** — рост/отток, что на это влияет
+7. **Оценка стратегии** — работает ли текущий подход? Что корректировать?
+8. **Риски** — что может ухудшить ситуацию
+9. **План на следующие 2 недели** — конкретные посты с датами, темами, форматами
+10. **Эксперименты** — 2-3 идеи, которые стоит попробовать и как измерить результат"""
     }
 
-    user_prompt = f"""{depth_prompts.get(depth, depth_prompts['standard'])}
+    user_prompt = depth_prompts.get(depth, depth_prompts["standard"])
 
-Данные канала:
-{data_context}"""
-
-    async with httpx.AsyncClient(timeout=90) as client:
+    async with httpx.AsyncClient(timeout=120) as client:
         resp = await client.post(
             "https://api.openai.com/v1/chat/completions",
             headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
             json={
-                "model": "gpt-4o-mini",
-                "temperature": 0.4,
-                "max_tokens": 4000,
+                "model": "gpt-4o",
+                "temperature": 0.3,
+                "max_tokens": 8000,
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
@@ -573,8 +678,6 @@ async def run_analysis(days: int = Query(7), depth: str = Query("standard")):
         "depth": depth,
         "period_days": days,
         "posts_analyzed": len(posts),
-        "snapshots_used": len(snapshots),
-        "created_at": now
     }
 
 
@@ -646,17 +749,155 @@ async def export_report(days: int = 7):
     )
 
 
+# ── Posts with classification ─────────────────────────────────────────
+
+@app.get("/api/posts-classified", dependencies=[Depends(check_auth)])
+def get_posts_classified(days: int = 30):
+    """Posts with auto-classified type and vs-average delta."""
+    cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT post_id, date, text, views, forwards, reactions, shares, link
+            FROM posts WHERE date >= ? ORDER BY date DESC
+        """, (cutoff,)).fetchall()
+    posts = [dict(r) for r in rows]
+    if not posts:
+        return []
+    avg_views = sum(p["views"] for p in posts) / len(posts)
+    for p in posts:
+        p["type"] = classify_post(p.get("text", ""))
+        p["vs_avg"] = round((p["views"] - avg_views) / avg_views * 100, 1) if avg_views else 0
+    return posts
+
+
+@app.get("/api/content-mix", dependencies=[Depends(check_auth)])
+def get_content_mix(days: int = 30):
+    """Content mix breakdown for charts."""
+    cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT text, views FROM posts WHERE date >= ?", (cutoff,)
+        ).fetchall()
+    from collections import defaultdict
+    mix = defaultdict(lambda: {"count": 0, "total_views": 0})
+    for r in rows:
+        t = classify_post(r["text"])
+        mix[t]["count"] += 1
+        mix[t]["total_views"] += r["views"]
+    result = []
+    for t, d in mix.items():
+        result.append({
+            "type": t,
+            "count": d["count"],
+            "avg_views": round(d["total_views"] / d["count"]) if d["count"] else 0,
+            "total_views": d["total_views"]
+        })
+    return sorted(result, key=lambda x: -x["count"])
+
+
+# ── Cron (daily auto-collect) ────────────────────────────────────────
+
+@app.post("/api/cron/daily")
+async def cron_daily(request: Request):
+    """Ежедневный сбор данных (вызывается Render cron)."""
+    secret = request.headers.get("X-Cron-Secret", "")
+    if secret != CRON_SECRET:
+        raise HTTPException(403, "Invalid cron secret")
+
+    results = {}
+
+    try:
+        channel_info = await tgstat_request("channels/get")
+        channel_stat = await tgstat_request("channels/stat")
+        now_ts = int(time.time())
+        two_days_ago = now_ts - 2 * 86400
+        posts_data = await tgstat_request("channels/posts", {
+            "startTime": str(two_days_ago), "endTime": str(now_ts), "limit": "50"
+        })
+        posts_list = posts_data if isinstance(posts_data, list) else posts_data.get("items", [])
+
+        collected_at = datetime.utcnow().isoformat()
+        with get_db() as conn:
+            cur = conn.execute("""
+                INSERT INTO snapshots (collected_at, participants, avg_reach, err_percent,
+                    daily_reach, ci_index, posts_count, channel_title, raw_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                collected_at,
+                channel_stat.get("participants_count", 0),
+                channel_stat.get("avg_post_reach", 0),
+                channel_stat.get("err_percent", 0),
+                channel_stat.get("daily_reach", 0),
+                channel_stat.get("ci_index", 0),
+                len(posts_list),
+                channel_info.get("title", "MOST"),
+                json.dumps({"channel_stat": channel_stat}, ensure_ascii=False)
+            ))
+            snapshot_id = cur.lastrowid
+
+            for p in posts_list:
+                post_id = p.get("id") or hashlib.md5(
+                    (p.get("link", "") + str(p.get("date", ""))).encode()
+                ).hexdigest()
+                date_val = p.get("date", "")
+                if isinstance(date_val, (int, float)):
+                    date_val = datetime.utcfromtimestamp(date_val).isoformat()
+                conn.execute("""
+                    INSERT OR REPLACE INTO posts
+                        (post_id, snapshot_id, date, text, views, forwards, reactions, shares, link)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    str(post_id), snapshot_id, date_val,
+                    (p.get("text") or "")[:500],
+                    p.get("views", 0),
+                    p.get("forwards_count", p.get("forwards", 0)),
+                    p.get("reactions_count", 0),
+                    p.get("shares_count", p.get("shares", 0)),
+                    p.get("link", "")
+                ))
+
+        results["tgstat"] = {"ok": True, "snapshot_id": snapshot_id, "posts": len(posts_list)}
+    except Exception as e:
+        results["tgstat"] = {"ok": False, "error": str(e)}
+
+    try:
+        scraped = await _scrape_telegram_channel(CHANNEL_ID, max_pages=2)
+        new_count = 0
+        if scraped:
+            with get_db() as conn:
+                for p in scraped:
+                    try:
+                        conn.execute("""
+                            INSERT OR IGNORE INTO posts
+                                (post_id, snapshot_id, date, text, views, forwards, reactions, shares, link)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (str(p["post_id"]), 0, p["date"], p["text"], p["views"], 0, 0, 0, p["link"]))
+                        new_count += 1
+                    except Exception:
+                        pass
+        results["scrape"] = {"ok": True, "posts_checked": len(scraped), "new": new_count}
+    except Exception as e:
+        results["scrape"] = {"ok": False, "error": str(e)}
+
+    return {"status": "ok", "collected_at": datetime.utcnow().isoformat(), "results": results}
+
+
 # ── Health & Config ───────────────────────────────────────────────────
 
 @app.get("/api/health")
 def health():
+    with get_db() as conn:
+        last_snap = conn.execute(
+            "SELECT collected_at FROM snapshots ORDER BY collected_at DESC LIMIT 1"
+        ).fetchone()
     return {
         "status": "ok",
         "tgstat_configured": bool(TGSTAT_TOKEN and TGSTAT_TOKEN != "your_tgstat_token_here"),
         "openai_configured": bool(OPENAI_API_KEY and OPENAI_API_KEY != "sk-your_openai_key_here"),
         "channel_id": CHANNEL_ID,
         "db_path": str(DB_PATH),
-        "db_exists": DB_PATH.exists()
+        "db_exists": DB_PATH.exists(),
+        "last_collected": dict(last_snap)["collected_at"] if last_snap else None
     }
 
 

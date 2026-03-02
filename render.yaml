@@ -11,3 +11,14 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: DASHBOARD_PASSWORD
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+  - type: cron
+    name: most-analytics-daily
+    runtime: python
+    buildCommand: pip install httpx
+    schedule: "0 8 * * *"
+    startCommand: python -c "import httpx; r=httpx.post('https://most-analytics.onrender.com/api/cron/daily', headers={'X-Cron-Secret':'mostsecret2026'}, timeout=60); print(r.status_code, r.text[:200])"
+    envVars: []

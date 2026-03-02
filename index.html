@@ -8,233 +8,104 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
         :root {
-            --bg: #0f1117;
-            --surface: #1a1d27;
-            --surface2: #232736;
-            --border: #2e3348;
-            --text: #e1e4ed;
-            --text2: #8b90a5;
-            --accent: #6c5ce7;
-            --accent2: #a29bfe;
-            --green: #00b894;
-            --red: #e17055;
-            --orange: #fdcb6e;
-            --blue: #74b9ff;
+            --bg: #0f1117; --surface: #1a1d27; --surface2: #232736; --border: #2e3348;
+            --text: #e1e4ed; --text2: #8b90a5; --accent: #6c5ce7; --accent2: #a29bfe;
+            --green: #00b894; --red: #e17055; --orange: #fdcb6e; --blue: #74b9ff;
             --radius: 12px;
         }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+        .container { max-width: 1320px; margin: 0 auto; padding: 20px; }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            line-height: 1.6;
-            min-height: 100vh;
-        }
-
-        .container {
-            max-width: 1280px;
-            margin: 0 auto;
-            padding: 24px;
-        }
-
-        header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 32px;
-            flex-wrap: wrap;
-            gap: 16px;
-        }
-        header h1 {
-            font-size: 28px;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--accent), var(--accent2));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        header .subtitle { color: var(--text2); font-size: 14px; }
-
-        .actions { display: flex; gap: 10px; flex-wrap: wrap; }
-        .btn {
-            padding: 10px 20px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            background: var(--surface);
-            color: var(--text);
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.2s;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
+        /* Header */
+        header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+        header h1 { font-size: 26px; font-weight: 700; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .subtitle { color: var(--text2); font-size: 13px; }
+        .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .btn { padding: 8px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); cursor: pointer; font-size: 13px; transition: all 0.2s; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
         .btn:hover { border-color: var(--accent); background: var(--surface2); }
         .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
         .btn.primary:hover { background: #5a4bd4; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        select { padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; }
+        input[type=number] { padding: 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; width: 65px; }
 
-        .status-bar {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            padding: 10px 16px;
-            background: var(--surface);
-            border-radius: 8px;
-            margin-bottom: 24px;
-            font-size: 13px;
-            color: var(--text2);
-            flex-wrap: wrap;
-        }
-        .status-dot {
-            width: 8px; height: 8px;
-            border-radius: 50%;
-            background: var(--red);
-        }
-        .status-dot.ok { background: var(--green); }
+        /* Freshness banner */
+        .freshness { display: flex; gap: 8px; align-items: center; padding: 10px 16px; background: var(--surface); border-radius: 8px; margin-bottom: 20px; font-size: 13px; color: var(--text2); }
+        .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .dot.fresh { background: var(--green); }
+        .dot.stale { background: var(--orange); }
+        .dot.dead { background: var(--red); }
 
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 32px;
-        }
-        .kpi-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 20px;
-        }
-        .kpi-card .label { font-size: 13px; color: var(--text2); margin-bottom: 4px; }
-        .kpi-card .value { font-size: 28px; font-weight: 700; }
-        .kpi-card .delta { font-size: 13px; margin-top: 4px; }
-        .kpi-card .delta.up { color: var(--green); }
-        .kpi-card .delta.down { color: var(--red); }
-        .kpi-card .delta.stable { color: var(--text2); }
+        /* KPI grid */
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 24px; }
+        .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+        .kpi .label { font-size: 12px; color: var(--text2); margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .kpi .value { font-size: 24px; font-weight: 700; }
+        .kpi .delta { font-size: 12px; margin-top: 2px; }
+        .kpi .delta.up { color: var(--green); }
+        .kpi .delta.down { color: var(--red); }
 
-        .section {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 24px;
-            margin-bottom: 24px;
-        }
-        .section h2 {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .charts-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-            margin-bottom: 24px;
-        }
+        /* Charts */
+        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
         @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+        .chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+        .chart-box h3 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text2); }
+        .chart-wrap { position: relative; height: 240px; }
 
-        .chart-container {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 20px;
-        }
-        .chart-container h3 {
-            font-size: 15px;
-            font-weight: 600;
-            margin-bottom: 12px;
-            color: var(--text2);
-        }
-        .chart-wrap { position: relative; height: 260px; }
+        /* Smart charts row */
+        .smart-charts { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+        @media (max-width: 1100px) { .smart-charts { grid-template-columns: 1fr; } }
 
-        table { width: 100%; border-collapse: collapse; }
-        th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
-        th { font-size: 12px; text-transform: uppercase; color: var(--text2); font-weight: 600; }
-        td { font-size: 14px; }
-        tr:hover td { background: var(--surface2); }
-        .text-preview { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        a { color: var(--accent2); text-decoration: none; }
-        a:hover { text-decoration: underline; }
-
-        .analysis-controls {
-            display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center;
-        }
-        select {
-            padding: 8px 12px;
-            background: var(--surface2);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text);
-            font-size: 14px;
-        }
-        .analysis-content {
-            background: var(--surface2);
-            border-radius: 8px;
-            padding: 20px;
-            min-height: 100px;
-            line-height: 1.8;
-        }
-        .analysis-content h1,
-        .analysis-content h2,
-        .analysis-content h3 { margin-top: 16px; margin-bottom: 8px; color: var(--accent2); }
-        .analysis-content ul, .analysis-content ol { margin-left: 20px; margin-bottom: 12px; }
-        .analysis-content li { margin-bottom: 4px; }
-        .analysis-content p { margin-bottom: 10px; }
-        .analysis-content strong { color: #fff; }
-        .analysis-content code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
-
-        .history-item {
-            padding: 12px 16px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            margin-bottom: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .history-item:hover { border-color: var(--accent); }
-        .history-item .meta { font-size: 12px; color: var(--text2); }
-
-        .loader {
-            display: inline-block;
-            width: 16px; height: 16px;
-            border: 2px solid var(--border);
-            border-top-color: var(--accent);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        .empty-state {
-            text-align: center;
-            padding: 48px;
-            color: var(--text2);
-        }
-        .empty-state p { margin-bottom: 16px; }
-
-        .tabs {
-            display: flex;
-            gap: 4px;
-            margin-bottom: 16px;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 0;
-        }
-        .tab {
-            padding: 8px 16px;
-            cursor: pointer;
-            font-size: 14px;
-            color: var(--text2);
-            border-bottom: 2px solid transparent;
-            transition: all 0.2s;
-        }
+        /* Tabs */
+        .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+        .tab { padding: 8px 16px; cursor: pointer; font-size: 14px; color: var(--text2); border-bottom: 2px solid transparent; transition: all 0.2s; }
         .tab.active { color: var(--accent2); border-bottom-color: var(--accent); }
         .tab:hover { color: var(--text); }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
+
+        /* Section */
+        .section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; }
+        .section h2 { font-size: 17px; font-weight: 600; margin-bottom: 14px; }
+
+        /* Table */
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 13px; }
+        th { font-size: 11px; text-transform: uppercase; color: var(--text2); font-weight: 600; }
+        tr:hover td { background: var(--surface2); }
+        .text-preview { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        a { color: var(--accent2); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+        .badge.vacancy { background: #6c5ce720; color: var(--accent2); }
+        .badge.career { background: #00b89420; color: var(--green); }
+        .badge.story { background: #74b9ff20; color: var(--blue); }
+        .badge.announce { background: #fdcb6e20; color: var(--orange); }
+        .badge.interactive { background: #e1705520; color: var(--red); }
+        .delta-cell.up { color: var(--green); }
+        .delta-cell.down { color: var(--red); }
+
+        /* Analysis */
+        .analysis-controls { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+        .analysis-content { background: var(--surface2); border-radius: 8px; padding: 20px; min-height: 100px; line-height: 1.8; }
+        .analysis-content h1, .analysis-content h2, .analysis-content h3 { margin-top: 16px; margin-bottom: 8px; color: var(--accent2); }
+        .analysis-content ul, .analysis-content ol { margin-left: 20px; margin-bottom: 12px; }
+        .analysis-content li { margin-bottom: 4px; }
+        .analysis-content p { margin-bottom: 10px; }
+        .analysis-content strong { color: #fff; }
+        .analysis-content table { margin: 12px 0; }
+        .analysis-content code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+
+        .history-item { padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
+        .history-item:hover { border-color: var(--accent); }
+        .history-item .meta { font-size: 12px; color: var(--text2); }
+
+        .loader { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .empty-state { text-align: center; padding: 40px; color: var(--text2); }
+        .empty-state p { margin-bottom: 12px; }
     </style>
 </head>
 <body>
@@ -242,120 +113,87 @@
     <header>
         <div>
             <h1>MOST Analytics</h1>
-            <div class="subtitle" id="channelName">Загрузка...</div>
+            <div class="subtitle" id="channelName">@mostcareer</div>
         </div>
         <div class="actions">
-            <select id="historyDays" onchange="toggleCustomDays()" style="padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px 0 0 8px;color:var(--text);font-size:14px;border-right:none;">
+            <select id="historyDays" onchange="toggleCustomDays()">
                 <option value="7">7 дней</option>
                 <option value="14">14 дней</option>
                 <option value="30" selected>30 дней</option>
                 <option value="60">60 дней</option>
                 <option value="90">90 дней</option>
                 <option value="180">180 дней</option>
-                <option value="365">365 дней</option>
                 <option value="0">Все посты</option>
-                <option value="custom">Своё значение...</option>
+                <option value="custom">Своё...</option>
             </select>
-            <input id="customDays" type="number" min="1" max="999" placeholder="дней" style="display:none;width:70px;padding:10px 8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:14px;border-right:none;">
-            <button class="btn primary" onclick="collectAll()" id="collectBtn" style="border-radius:0 8px 8px 0;">
-                Обновить данные
-            </button>
-            <a class="btn" id="csvLink" href="/api/export/csv?days=30" target="_blank">CSV экспорт</a>
-            <a class="btn" id="reportLink" href="/api/export/report?days=7" target="_blank">Отчёт .md</a>
+            <input id="customDays" type="number" min="1" max="999" placeholder="дн" style="display:none;">
+            <button class="btn primary" onclick="collectAll()" id="collectBtn">Обновить данные</button>
+            <a class="btn" id="csvLink" href="/api/export/csv?days=30" target="_blank">CSV</a>
+            <a class="btn" id="reportLink" href="/api/export/report?days=30" target="_blank">Отчёт</a>
         </div>
     </header>
 
-    <div class="status-bar" id="statusBar">
-        <span class="status-dot" id="statusDot"></span>
-        <span id="statusText">Проверка соединения...</span>
+    <!-- Freshness banner -->
+    <div class="freshness" id="freshness">
+        <span class="dot" id="freshDot"></span>
+        <span id="freshText">Проверка...</span>
     </div>
 
     <!-- KPI Cards -->
-    <div class="kpi-grid" id="kpiGrid">
-        <div class="kpi-card">
-            <div class="label">Подписчики</div>
-            <div class="value" id="kpiSubs">—</div>
-            <div class="delta" id="kpiSubsDelta"></div>
-        </div>
-        <div class="kpi-card">
-            <div class="label">Ср. охват поста</div>
-            <div class="value" id="kpiReach">—</div>
-            <div class="delta" id="kpiReachDelta"></div>
-        </div>
-        <div class="kpi-card">
-            <div class="label">ERR</div>
-            <div class="value" id="kpiERR">—</div>
-            <div class="delta" id="kpiERRDelta"></div>
-        </div>
-        <div class="kpi-card">
-            <div class="label">Постов за неделю</div>
-            <div class="value" id="kpiPosts">—</div>
-            <div class="delta" id="kpiPostsDelta"></div>
-        </div>
-        <div class="kpi-card">
-            <div class="label">Дневной охват</div>
-            <div class="value" id="kpiDaily">—</div>
-            <div class="delta" id="kpiDailyDelta"></div>
-        </div>
-        <div class="kpi-card">
-            <div class="label">Сборов данных</div>
-            <div class="value" id="kpiSnapshots">—</div>
-            <div class="delta stable">всего за всё время</div>
-        </div>
+    <div class="kpi-grid">
+        <div class="kpi"><div class="label">Подписчики</div><div class="value" id="kSubs">—</div><div class="delta" id="kSubsD"></div></div>
+        <div class="kpi"><div class="label">Ср. охват</div><div class="value" id="kReach">—</div><div class="delta" id="kReachD"></div></div>
+        <div class="kpi"><div class="label">ERR</div><div class="value" id="kERR">—</div><div class="delta" id="kERRD"></div></div>
+        <div class="kpi"><div class="label">ER</div><div class="value" id="kER">—</div><div class="delta" id="kERD"></div></div>
+        <div class="kpi"><div class="label">Дневной охват</div><div class="value" id="kDaily">—</div><div class="delta" id="kDailyD"></div></div>
+        <div class="kpi"><div class="label">CI индекс</div><div class="value" id="kCI">—</div><div class="delta" id="kCID"></div></div>
+        <div class="kpi"><div class="label">Упоминаний</div><div class="value" id="kMentions">—</div><div class="delta" id="kMentionsD"></div></div>
     </div>
 
-    <!-- Charts -->
+    <!-- Main charts (TGStat-style) -->
     <div class="charts-grid">
-        <div class="chart-container">
-            <h3>Подписчики</h3>
-            <div class="chart-wrap"><canvas id="chartSubs"></canvas></div>
-        </div>
-        <div class="chart-container">
-            <h3>Средний охват поста</h3>
-            <div class="chart-wrap"><canvas id="chartReach"></canvas></div>
-        </div>
-        <div class="chart-container">
-            <h3>ERR (Engagement Rate by Reach)</h3>
-            <div class="chart-wrap"><canvas id="chartERR"></canvas></div>
-        </div>
-        <div class="chart-container">
-            <h3>Количество постов</h3>
-            <div class="chart-wrap"><canvas id="chartPosts"></canvas></div>
-        </div>
+        <div class="chart-box"><h3>Подписчики</h3><div class="chart-wrap"><canvas id="cSubs"></canvas></div></div>
+        <div class="chart-box"><h3>Средний охват поста</h3><div class="chart-wrap"><canvas id="cReach"></canvas></div></div>
+        <div class="chart-box"><h3>ERR %</h3><div class="chart-wrap"><canvas id="cERR"></canvas></div></div>
+        <div class="chart-box"><h3>Просмотры за день</h3><div class="chart-wrap"><canvas id="cViews"></canvas></div></div>
     </div>
 
-    <!-- Tabs: Posts / Analysis / History -->
+    <!-- Smart charts -->
+    <div class="smart-charts">
+        <div class="chart-box"><h3>Охват по типу контента</h3><div class="chart-wrap"><canvas id="cMix"></canvas></div></div>
+        <div class="chart-box"><h3>Лучший день публикации</h3><div class="chart-wrap"><canvas id="cDays"></canvas></div></div>
+        <div class="chart-box"><h3>Контент-микс: факт vs стратегия</h3><div class="chart-wrap"><canvas id="cStrategy"></canvas></div></div>
+    </div>
+
+    <!-- Tabs -->
     <div class="tabs">
         <div class="tab active" data-tab="posts">Посты</div>
         <div class="tab" data-tab="analysis">GPT-анализ</div>
         <div class="tab" data-tab="history">История анализов</div>
     </div>
 
-    <!-- Tab: Posts -->
+    <!-- Posts tab -->
     <div class="tab-content active" id="tab-posts">
         <div class="section">
-            <h2>Топ постов</h2>
-            <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+            <h2>Посты канала</h2>
+            <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
                 <select id="postsDays" onchange="loadPosts()">
                     <option value="7">7 дней</option>
                     <option value="14">14 дней</option>
                     <option value="30" selected>30 дней</option>
                     <option value="90">90 дней</option>
+                    <option value="180">180 дней</option>
                 </select>
                 <select id="postsSort" onchange="loadPosts()">
                     <option value="views" selected>По просмотрам</option>
-                    <option value="forwards">По репостам</option>
-                    <option value="reactions">По реакциям</option>
                     <option value="date">По дате</option>
                 </select>
             </div>
-            <div id="postsTable">
-                <div class="empty-state"><p>Нет данных. Нажмите «Собрать данные».</p></div>
-            </div>
+            <div id="postsTable"><div class="empty-state"><p>Нажмите «Обновить данные» для загрузки.</p></div></div>
         </div>
     </div>
 
-    <!-- Tab: Analysis -->
+    <!-- Analysis tab -->
     <div class="tab-content" id="tab-analysis">
         <div class="section">
             <h2>GPT-аналитика</h2>
@@ -365,32 +203,28 @@
                     <option value="14">14 дней</option>
                     <option value="30" selected>30 дней</option>
                     <option value="90">90 дней</option>
+                    <option value="120">120 дней</option>
                 </select>
                 <select id="analysisDepth">
-                    <option value="quick">Быстрый обзор</option>
                     <option value="standard" selected>Стандартный</option>
-                    <option value="deep">Глубокий анализ</option>
+                    <option value="deep">Глубокий</option>
                 </select>
-                <button class="btn primary" onclick="runAnalysis()" id="analyzeBtn">
-                    Запустить анализ
-                </button>
+                <button class="btn primary" onclick="runAnalysis()" id="analyzeBtn">Запустить анализ</button>
             </div>
             <div class="analysis-content" id="analysisContent">
                 <div class="empty-state">
-                    <p>Выберите параметры и нажмите «Запустить анализ».</p>
-                    <p style="font-size:13px;">GPT проанализирует все собранные данные, сравнит периоды и даст рекомендации.</p>
+                    <p>Выберите период и глубину, нажмите «Запустить анализ».</p>
+                    <p style="font-size:12px;">GPT-4o проанализирует данные с привязкой к маркетинговой стратегии.</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Tab: History -->
+    <!-- History tab -->
     <div class="tab-content" id="tab-history">
         <div class="section">
             <h2>История анализов</h2>
-            <div id="analysisHistory">
-                <div class="empty-state"><p>Анализы ещё не проводились.</p></div>
-            </div>
+            <div id="analysisHistory"><div class="empty-state"><p>Анализы ещё не проводились.</p></div></div>
         </div>
     </div>
 </div>
@@ -398,24 +232,23 @@
 <script>
 const API = '';
 const charts = {};
-const chartDefaults = {
-    responsive: true,
-    maintainAspectRatio: false,
+const chartOpts = {
+    responsive: true, maintainAspectRatio: false,
     plugins: { legend: { display: false } },
     scales: {
-        x: { grid: { color: '#2e3348' }, ticks: { color: '#8b90a5', font: { size: 11 } } },
-        y: { grid: { color: '#2e3348' }, ticks: { color: '#8b90a5', font: { size: 11 } } }
+        x: { grid: { color: '#2e3348' }, ticks: { color: '#8b90a5', font: { size: 10 } } },
+        y: { grid: { color: '#2e3348' }, ticks: { color: '#8b90a5', font: { size: 10 } } }
     },
     elements: { line: { tension: 0.3, borderWidth: 2 }, point: { radius: 3, hoverRadius: 5 } }
 };
 
-// ── Init ──
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     checkHealth();
     loadSnapshots();
     loadMetrics();
     loadPosts();
+    loadSmartCharts();
     loadAnalysisHistory();
 });
 
@@ -430,52 +263,47 @@ function initTabs() {
     });
 }
 
-// ── API calls ──
 async function api(path, opts = {}) {
     const resp = await fetch(API + path, opts);
     if (resp.status === 401) { window.location.href = '/login'; return; }
-    if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.detail || resp.statusText);
-    }
+    if (!resp.ok) { const err = await resp.json().catch(() => ({})); throw new Error(err.detail || resp.statusText); }
     return resp.json();
 }
 
 async function checkHealth() {
     try {
         const h = await api('/api/health');
-        const dot = document.getElementById('statusDot');
-        const txt = document.getElementById('statusText');
-        const ok = h.tgstat_configured && h.openai_configured;
-        dot.classList.toggle('ok', ok);
+        const dot = document.getElementById('freshDot');
+        const txt = document.getElementById('freshText');
         const parts = [];
         parts.push(h.tgstat_configured ? 'TGStat OK' : 'TGStat: нет токена');
         parts.push(h.openai_configured ? 'OpenAI OK' : 'OpenAI: нет ключа');
-        if (h.channel_id) parts.push('Канал: ' + h.channel_id);
+        if (h.last_collected) {
+            const last = new Date(h.last_collected + 'Z');
+            const hours = (Date.now() - last.getTime()) / 3600000;
+            const timeStr = last.toLocaleString('ru-RU', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+            parts.push('Обновлено: ' + timeStr);
+            dot.className = 'dot ' + (hours < 25 ? 'fresh' : hours < 72 ? 'stale' : 'dead');
+        } else {
+            parts.push('Данных нет');
+            dot.className = 'dot dead';
+        }
         txt.textContent = parts.join(' · ');
-        document.getElementById('channelName').textContent = h.channel_id || 'Канал не настроен';
     } catch (e) {
-        document.getElementById('statusText').textContent = 'Сервер недоступен: ' + e.message;
+        document.getElementById('freshText').textContent = 'Сервер недоступен: ' + e.message;
     }
 }
 
 function toggleCustomDays() {
     const sel = document.getElementById('historyDays');
-    const inp = document.getElementById('customDays');
-    inp.style.display = sel.value === 'custom' ? 'inline-block' : 'none';
-    if (sel.value !== 'custom') {
-        const d = parseInt(sel.value) || 30;
-        document.getElementById('csvLink').href = '/api/export/csv?days=' + (d || 90);
-        document.getElementById('reportLink').href = '/api/export/report?days=' + (d || 7);
-    }
+    document.getElementById('customDays').style.display = sel.value === 'custom' ? 'inline-block' : 'none';
+    const d = sel.value === 'custom' ? 30 : parseInt(sel.value) || 30;
+    document.getElementById('csvLink').href = '/api/export/csv?days=' + (d || 90);
+    document.getElementById('reportLink').href = '/api/export/report?days=' + (d || 30);
 }
-
 function getSelectedDays() {
     const sel = document.getElementById('historyDays');
-    if (sel.value === 'custom') {
-        const v = parseInt(document.getElementById('customDays').value);
-        return isNaN(v) || v < 1 ? null : v;
-    }
+    if (sel.value === 'custom') { const v = parseInt(document.getElementById('customDays').value); return isNaN(v) || v < 1 ? null : v; }
     return parseInt(sel.value);
 }
 
@@ -495,182 +323,174 @@ async function scrapeFromBrowser(channel, days) {
         const textsRaw = [...html.matchAll(/class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/g)].map(m => m[1]);
         for (let i = 0; i < postIds.length; i++) {
             const vt = (viewsRaw[i] || '0').trim().replace(/\s/g, '');
-            let views = 0;
-            if (vt.endsWith('K')) views = Math.round(parseFloat(vt) * 1000);
-            else if (vt.endsWith('M')) views = Math.round(parseFloat(vt) * 1000000);
-            else views = parseInt(vt) || 0;
-            allPosts.push({
-                post_id: postIds[i],
-                link: `https://t.me/${clean}/${postIds[i]}`,
-                date: datesRaw[i] || '',
-                views,
-                text: (textsRaw[i] || '').replace(/<[^>]+>/g, ' ').trim().substring(0, 500)
-            });
+            let views = vt.endsWith('K') ? Math.round(parseFloat(vt)*1000) : vt.endsWith('M') ? Math.round(parseFloat(vt)*1e6) : parseInt(vt) || 0;
+            allPosts.push({ post_id: postIds[i], link: `https://t.me/${clean}/${postIds[i]}`, date: datesRaw[i]||'', views, text: (textsRaw[i]||'').replace(/<[^>]+>/g,' ').trim().substring(0,500) });
         }
         before = Math.min(...postIds.map(Number));
         if (before <= 1) break;
     }
-    if (days > 0) {
-        const cutoff = new Date(Date.now() - days * 86400000);
-        return allPosts.filter(p => !p.date || new Date(p.date) >= cutoff);
-    }
+    if (days > 0) { const cutoff = new Date(Date.now() - days*86400000); return allPosts.filter(p => !p.date || new Date(p.date) >= cutoff); }
     return allPosts;
 }
 
 async function collectAll() {
     const days = getSelectedDays();
-    if (days === null) { alert('Введите количество дней (от 1 до 999)'); return; }
+    if (days === null) { alert('Введите количество дней'); return; }
     const btn = document.getElementById('collectBtn');
     btn.disabled = true;
     const label = days === 0 ? 'все посты' : days + ' дн';
-
-    // 1. Метрики канала из TGStat
-    btn.innerHTML = '<span class="loader"></span> Метрики канала...';
+    btn.innerHTML = '<span class="loader"></span> Метрики...';
     let metricsOk = false;
-    try {
-        await api('/api/collect', { method: 'POST' });
-        metricsOk = true;
-    } catch (e) {
-        console.warn('TGStat metrics:', e.message);
-    }
-
-    // 2. Посты за выбранный период
+    try { await api('/api/collect', { method: 'POST' }); metricsOk = true; } catch(e) { console.warn(e); }
     btn.innerHTML = '<span class="loader"></span> Посты за ' + label + '...';
     let postsCount = 0;
-    try {
-        const res = await api('/api/collect-history?days=' + days, { method: 'POST' });
-        postsCount = res.posts_collected;
-    } catch (e) {
-        console.warn('Server scrape:', e.message);
-    }
-
-    // 3. Fallback: скрейпинг из браузера если сервер не смог
+    try { const r = await api('/api/collect-history?days='+days, {method:'POST'}); postsCount = r.posts_collected; } catch(e) { console.warn(e); }
     if (postsCount === 0) {
-        btn.innerHTML = '<span class="loader"></span> Скрейпинг постов...';
+        btn.innerHTML = '<span class="loader"></span> Скрейпинг...';
         try {
             const posts = await scrapeFromBrowser('@mostcareer', days);
             if (posts.length > 0) {
-                btn.innerHTML = `<span class="loader"></span> Сохранение ${posts.length} постов...`;
-                const up = await api('/api/upload-posts', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ posts })
-                });
+                const up = await api('/api/upload-posts', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({posts}) });
                 postsCount = up.posts_uploaded;
             }
-        } catch (e) {
-            console.warn('Browser scrape:', e.message);
-        }
+        } catch(e) { console.warn(e); }
     }
-
-    // Результат
     const parts = [];
     if (metricsOk) parts.push('метрики OK');
     if (postsCount > 0) parts.push(postsCount + ' постов');
-    if (!parts.length) parts.push('не удалось собрать данные');
-
+    if (!parts.length) parts.push('нет данных');
     btn.innerHTML = parts.join(' + ');
-    setTimeout(() => { btn.innerHTML = 'Обновить данные'; btn.disabled = false; }, 4000);
-    loadSnapshots(); loadMetrics(); loadPosts();
+    setTimeout(() => { btn.innerHTML = 'Обновить данные'; btn.disabled = false; }, 3500);
+    checkHealth(); loadSnapshots(); loadMetrics(); loadPosts(); loadSmartCharts();
 }
 
 async function loadSnapshots() {
     try {
         const snaps = await api('/api/snapshots?limit=100');
-        document.getElementById('kpiSnapshots').textContent = snaps.length;
-        if (snaps.length === 0) return;
-
-        const latest = snaps[0];
-        const prev = snaps.length > 1 ? snaps[1] : null;
-
-        setKPI('kpiSubs', latest.participants, prev?.participants);
-        setKPI('kpiReach', latest.avg_reach, prev?.avg_reach);
-        setKPI('kpiERR', latest.err_percent, prev?.err_percent, '%');
-        setKPI('kpiPosts', latest.posts_count, prev?.posts_count);
-        setKPI('kpiDaily', latest.daily_reach, prev?.daily_reach);
-    } catch (e) { console.error('loadSnapshots:', e); }
+        if (!snaps.length) return;
+        const la = snaps[0], pr = snaps.length > 1 ? snaps[1] : null;
+        setKPI('kSubs', la.participants, pr?.participants);
+        setKPI('kReach', la.avg_reach, pr?.avg_reach);
+        setKPI('kERR', la.err_percent, pr?.err_percent, '%');
+        setKPI('kDaily', la.daily_reach, pr?.daily_reach);
+        setKPI('kCI', la.ci_index, pr?.ci_index);
+    } catch(e) { console.error(e); }
 }
-
-function setKPI(id, value, prevValue, suffix = '') {
+function setKPI(id, val, prev, sfx = '') {
     const el = document.getElementById(id);
-    const deltaEl = document.getElementById(id + 'Delta');
-    el.textContent = typeof value === 'number'
-        ? (Number.isInteger(value) ? value.toLocaleString('ru-RU') : value.toFixed(1)) + suffix
-        : '—';
-    if (deltaEl && prevValue != null && typeof value === 'number') {
-        const diff = value - prevValue;
-        const pct = prevValue !== 0 ? ((diff / prevValue) * 100).toFixed(1) : 0;
+    const de = document.getElementById(id + 'D');
+    el.textContent = typeof val === 'number' ? (Number.isInteger(val) ? val.toLocaleString('ru-RU') : val.toFixed(1)) + sfx : '—';
+    if (de && prev != null && typeof val === 'number') {
+        const diff = val - prev;
+        const pct = prev ? ((diff/prev)*100).toFixed(1) : 0;
         const sign = diff > 0 ? '+' : '';
-        deltaEl.textContent = `${sign}${typeof diff === 'number' && Number.isInteger(diff) ? diff.toLocaleString('ru-RU') : diff.toFixed(1)} (${sign}${pct}%)`;
-        deltaEl.className = 'delta ' + (diff > 0 ? 'up' : diff < 0 ? 'down' : 'stable');
+        de.textContent = `${sign}${Number.isInteger(diff)?diff.toLocaleString('ru-RU'):diff.toFixed(1)} (${sign}${pct}%)`;
+        de.className = 'delta ' + (diff > 0 ? 'up' : diff < 0 ? 'down' : '');
     }
 }
 
 async function loadMetrics() {
     try {
         const data = await api('/api/metrics');
-        if (data.length === 0) return;
-
-        const labels = data.map(d => {
-            const dt = new Date(d.collected_at);
-            return dt.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-        });
-
-        renderChart('chartSubs', labels, data.map(d => d.participants), '#6c5ce7');
-        renderChart('chartReach', labels, data.map(d => d.avg_reach), '#74b9ff');
-        renderChart('chartERR', labels, data.map(d => d.err_percent), '#00b894');
-        renderChart('chartPosts', labels, data.map(d => d.posts_count), '#fdcb6e', 'bar');
-    } catch (e) { console.error('loadMetrics:', e); }
+        if (!data.length) return;
+        const labels = data.map(d => new Date(d.collected_at).toLocaleDateString('ru-RU', {day:'numeric',month:'short'}));
+        mkChart('cSubs', labels, data.map(d => d.participants), '#6c5ce7');
+        mkChart('cReach', labels, data.map(d => d.avg_reach), '#74b9ff');
+        mkChart('cERR', labels, data.map(d => d.err_percent), '#00b894');
+        mkChart('cViews', labels, data.map(d => d.daily_reach), '#fdcb6e', 'bar');
+    } catch(e) { console.error(e); }
+}
+function mkChart(id, labels, values, color, type='line') {
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(document.getElementById(id).getContext('2d'), {
+        type, data: { labels, datasets: [{ data: values, borderColor: color, backgroundColor: type==='bar' ? color+'88' : color+'20', fill: type==='line' }] }, options: chartOpts
+    });
 }
 
-function renderChart(canvasId, labels, values, color, type = 'line') {
-    if (charts[canvasId]) charts[canvasId].destroy();
-    const ctx = document.getElementById(canvasId).getContext('2d');
-    charts[canvasId] = new Chart(ctx, {
-        type,
-        data: {
-            labels,
-            datasets: [{
-                data: values,
-                borderColor: color,
-                backgroundColor: type === 'bar' ? color + '88' : color + '20',
-                fill: type === 'line'
-            }]
-        },
-        options: chartDefaults
-    });
+async function loadSmartCharts() {
+    try {
+        const mix = await api('/api/content-mix?days=120');
+        if (mix.length) {
+            const typeLabels = { vacancy:'Вакансии', career:'Карьера', story:'Истории', announce:'Анонсы', interactive:'Интерактив' };
+            const typeColors = { vacancy:'#a29bfe', career:'#00b894', story:'#74b9ff', announce:'#fdcb6e', interactive:'#e17055' };
+            const labels = mix.map(m => typeLabels[m.type] || m.type);
+            const colors = mix.map(m => typeColors[m.type] || '#8b90a5');
+
+            if (charts.cMix) charts.cMix.destroy();
+            charts.cMix = new Chart(document.getElementById('cMix').getContext('2d'), {
+                type: 'bar', data: { labels, datasets: [{ data: mix.map(m => m.avg_views), backgroundColor: colors }] },
+                options: { ...chartOpts, plugins: { legend: { display: false } }, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, title: { display: true, text: 'Ср. просмотры', color: '#8b90a5', font: { size: 11 } } } } }
+            });
+
+            // Strategy comparison
+            const stratTarget = { vacancy: 30, career: 30, story: 20, announce: 10, interactive: 10 };
+            const totalPosts = mix.reduce((s, m) => s + m.count, 0);
+            const factPcts = {};
+            mix.forEach(m => { factPcts[m.type] = totalPosts ? Math.round(m.count / totalPosts * 100) : 0; });
+            const types = ['vacancy','career','story','announce','interactive'];
+            const tLabels = types.map(t => typeLabels[t] || t);
+
+            if (charts.cStrategy) charts.cStrategy.destroy();
+            charts.cStrategy = new Chart(document.getElementById('cStrategy').getContext('2d'), {
+                type: 'bar', data: { labels: tLabels, datasets: [
+                    { label: 'Факт', data: types.map(t => factPcts[t] || 0), backgroundColor: '#6c5ce788' },
+                    { label: 'Стратегия', data: types.map(t => stratTarget[t] || 0), backgroundColor: '#00b89488' }
+                ]}, options: { ...chartOpts, plugins: { legend: { display: true, labels: { color: '#8b90a5', font: { size: 11 } } } }, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, title: { display: true, text: '%', color: '#8b90a5', font: { size: 11 } } } } }
+            });
+        }
+
+        // Best day chart from posts
+        const posts = await api('/api/posts-classified?days=120');
+        if (posts.length) {
+            const dayNames = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+            const dayData = Array(7).fill(null).map(() => []);
+            posts.forEach(p => {
+                if (p.date) { const d = new Date(p.date).getDay(); dayData[d].push(p.views); }
+            });
+            const dayLabels = [], dayAvgs = [], dayColors = [];
+            [1,2,3,4,5,6,0].forEach(d => {
+                if (dayData[d].length) {
+                    dayLabels.push(dayNames[d]);
+                    const avg = dayData[d].reduce((a,b)=>a+b,0)/dayData[d].length;
+                    dayAvgs.push(Math.round(avg));
+                    dayColors.push(d===4||d===5 ? '#00b89488' : '#74b9ff88');
+                }
+            });
+            if (charts.cDays) charts.cDays.destroy();
+            charts.cDays = new Chart(document.getElementById('cDays').getContext('2d'), {
+                type: 'bar', data: { labels: dayLabels, datasets: [{ data: dayAvgs, backgroundColor: dayColors }] },
+                options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, title: { display: true, text: 'Ср. просмотры', color: '#8b90a5', font: { size: 11 } } } } }
+            });
+        }
+    } catch(e) { console.error('smartCharts:', e); }
 }
 
 async function loadPosts() {
     const days = document.getElementById('postsDays').value;
     const sort = document.getElementById('postsSort').value;
     try {
-        const posts = await api(`/api/posts?days=${days}&sort=${sort}&limit=50`);
-        if (posts.length === 0) {
-            document.getElementById('postsTable').innerHTML =
-                '<div class="empty-state"><p>Нет данных за выбранный период.</p></div>';
-            return;
-        }
-        let html = '<table><thead><tr>';
-        html += '<th>Дата</th><th>Текст</th><th>Просмотры</th><th>Репосты</th><th>Реакции</th><th>Ссылка</th>';
-        html += '</tr></thead><tbody>';
+        const posts = await api(`/api/posts-classified?days=${days}`);
+        if (!posts.length) { document.getElementById('postsTable').innerHTML = '<div class="empty-state"><p>Нет данных за период.</p></div>'; return; }
+        if (sort === 'views') posts.sort((a,b) => b.views - a.views);
+        let html = '<table><thead><tr><th>Дата</th><th>Тип</th><th>Текст</th><th>Просмотры</th><th>vs ср.</th><th>Ссылка</th></tr></thead><tbody>';
         for (const p of posts) {
-            const date = p.date ? new Date(p.date).toLocaleDateString('ru-RU', {day:'numeric',month:'short'}) : '—';
-            const text = (p.text || '').substring(0, 80) + ((p.text||'').length > 80 ? '...' : '');
+            const date = p.date ? new Date(p.date).toLocaleDateString('ru-RU',{day:'numeric',month:'short'}) : '—';
+            const text = (p.text||'').substring(0,80) + ((p.text||'').length > 80 ? '...' : '');
+            const typeLabel = {vacancy:'Вакансия',career:'Карьера',story:'История',announce:'Анонс',interactive:'Интерактив'}[p.type] || p.type;
+            const deltaClass = p.vs_avg > 20 ? 'up' : p.vs_avg < -20 ? 'down' : '';
+            const sign = p.vs_avg > 0 ? '+' : '';
             html += `<tr>
                 <td>${date}</td>
-                <td class="text-preview" title="${(p.text||'').replace(/"/g, '&quot;')}">${text}</td>
+                <td><span class="badge ${p.type}">${typeLabel}</span></td>
+                <td class="text-preview" title="${(p.text||'').replace(/"/g,'&quot;')}">${text}</td>
                 <td><strong>${(p.views||0).toLocaleString('ru-RU')}</strong></td>
-                <td>${p.forwards||0}</td>
-                <td>${p.reactions||0}</td>
+                <td class="delta-cell ${deltaClass}">${sign}${p.vs_avg}%</td>
                 <td>${p.link ? `<a href="${p.link}" target="_blank">Открыть</a>` : '—'}</td>
             </tr>`;
         }
         html += '</tbody></table>';
         document.getElementById('postsTable').innerHTML = html;
-    } catch (e) {
-        document.getElementById('postsTable').innerHTML = `<div class="empty-state"><p>Ошибка: ${e.message}</p></div>`;
-    }
+    } catch(e) { document.getElementById('postsTable').innerHTML = `<div class="empty-state"><p>Ошибка: ${e.message}</p></div>`; }
 }
 
 async function runAnalysis() {
@@ -678,47 +498,30 @@ async function runAnalysis() {
     const content = document.getElementById('analysisContent');
     const days = document.getElementById('analysisDays').value;
     const depth = document.getElementById('analysisDepth').value;
-
     btn.disabled = true;
     btn.innerHTML = '<span class="loader"></span> Анализирую...';
-    content.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text2)"><span class="loader" style="width:24px;height:24px;border-width:3px;display:inline-block;margin-bottom:12px;"></span><br>GPT анализирует данные...<br><span style="font-size:12px;">Глубокий анализ может занять до минуты</span></div>';
-
+    content.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text2)"><span class="loader" style="width:24px;height:24px;border-width:3px;display:inline-block;margin-bottom:12px;"></span><br>GPT-4o анализирует данные...<br><span style="font-size:12px;">Глубокий анализ может занять до 2 минут</span></div>';
     try {
         const res = await api(`/api/analyze?days=${days}&depth=${depth}`, { method: 'POST' });
         content.innerHTML = marked.parse(res.analysis);
         loadAnalysisHistory();
-    } catch (e) {
-        content.innerHTML = `<div style="color:var(--red);padding:20px;">Ошибка: ${e.message}</div>`;
-    }
-    btn.innerHTML = 'Запустить анализ';
-    btn.disabled = false;
+    } catch(e) { content.innerHTML = `<div style="color:var(--red);padding:20px;">Ошибка: ${e.message}</div>`; }
+    btn.innerHTML = 'Запустить анализ'; btn.disabled = false;
 }
 
 async function loadAnalysisHistory() {
     try {
         const items = await api('/api/analyses?limit=20');
         const el = document.getElementById('analysisHistory');
-        if (items.length === 0) {
-            el.innerHTML = '<div class="empty-state"><p>Анализы ещё не проводились.</p></div>';
-            return;
-        }
+        if (!items.length) { el.innerHTML = '<div class="empty-state"><p>Анализы ещё не проводились.</p></div>'; return; }
         el.innerHTML = items.map(a => {
-            const date = new Date(a.created_at).toLocaleString('ru-RU', {
-                day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'
-            });
-            const typeLabel = {quick:'Быстрый',standard:'Стандартный',deep:'Глубокий'}[a.analysis_type] || a.analysis_type;
-            const preview = (a.gpt_response || '').substring(0, 150) + '...';
-            return `<div class="history-item" onclick="showAnalysis(${a.id})">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <strong>${typeLabel} анализ</strong>
-                    <span class="meta">${date}</span>
-                </div>
-                <div class="meta" style="margin-top:4px;">${preview}</div>
-            </div>`;
+            const date = new Date(a.created_at).toLocaleString('ru-RU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+            const typeLabel = {standard:'Стандартный',deep:'Глубокий'}[a.analysis_type] || a.analysis_type;
+            const preview = (a.gpt_response||'').substring(0,150)+'...';
+            return `<div class="history-item" onclick="showAnalysis(${a.id})"><div style="display:flex;justify-content:space-between;align-items:center;"><strong>${typeLabel} анализ</strong><span class="meta">${date}</span></div><div class="meta" style="margin-top:4px;">${preview}</div></div>`;
         }).join('');
-    } catch (e) { console.error('loadAnalysisHistory:', e); }
+    } catch(e) { console.error(e); }
 }
-
 async function showAnalysis(id) {
     try {
         const items = await api('/api/analyses?limit=50');
@@ -730,7 +533,7 @@ async function showAnalysis(id) {
             document.querySelector('[data-tab="analysis"]').classList.add('active');
             document.getElementById('tab-analysis').classList.add('active');
         }
-    } catch (e) { console.error('showAnalysis:', e); }
+    } catch(e) { console.error(e); }
 }
 </script>
 </body>

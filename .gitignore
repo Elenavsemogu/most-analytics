@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 analytics.db-shm
 analytics.db-wal
+_raw_posts_4months.json
