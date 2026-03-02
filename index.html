@@ -248,8 +248,15 @@
             <button class="btn primary" onclick="collectData()" id="collectBtn">
                 Собрать данные
             </button>
-            <button class="btn" onclick="collectHistory()" id="historyBtn">
-                Загрузить историю (90 дней)
+            <select id="historyDays" style="padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px 0 0 8px;color:var(--text);font-size:14px;border-right:none;">
+                <option value="30">30 дней</option>
+                <option value="60">60 дней</option>
+                <option value="90" selected>90 дней</option>
+                <option value="180">180 дней</option>
+                <option value="365">365 дней</option>
+            </select>
+            <button class="btn" onclick="collectHistory()" id="historyBtn" style="border-radius:0 8px 8px 0;">
+                Загрузить историю
             </button>
             <a class="btn" href="/api/export/csv?days=90" target="_blank">CSV экспорт</a>
             <a class="btn" href="/api/export/report?days=7" target="_blank">Отчёт .md</a>
@@ -470,13 +477,14 @@ async function collectData() {
 }
 
 async function collectHistory() {
+    const days = document.getElementById('historyDays').value;
     const btn = document.getElementById('historyBtn');
     btn.disabled = true;
-    btn.innerHTML = '<span class="loader"></span> Загрузка 90 дней...';
+    btn.innerHTML = '<span class="loader"></span> Загрузка ' + days + ' дн...';
     try {
-        const res = await api('/api/collect-history?days=90', { method: 'POST' });
-        btn.innerHTML = `Готово! ${res.posts_collected} постов за ${res.days_collected} дн.`;
-        setTimeout(() => { btn.innerHTML = 'Загрузить историю (90 дней)'; btn.disabled = false; }, 4000);
+        const res = await api('/api/collect-history?days=' + days, { method: 'POST' });
+        btn.innerHTML = `Готово! ${res.posts_collected} постов`;
+        setTimeout(() => { btn.innerHTML = 'Загрузить историю'; btn.disabled = false; }, 4000);
         loadSnapshots();
         loadMetrics();
         loadPosts();
@@ -484,7 +492,7 @@ async function collectHistory() {
         btn.innerHTML = 'Ошибка';
         btn.disabled = false;
         alert('Ошибка загрузки истории: ' + e.message);
-        setTimeout(() => { btn.innerHTML = 'Загрузить историю (90 дней)'; }, 2000);
+        setTimeout(() => { btn.innerHTML = 'Загрузить историю'; }, 2000);
     }
 }
 
