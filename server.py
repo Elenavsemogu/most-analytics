@@ -341,9 +341,17 @@ async def _scrape_telegram_channel(username: str, max_pages: int = 30):
 @app.post("/api/collect-history", dependencies=[Depends(check_auth)])
 async def collect_history(days: int = Query(0)):
     """Загрузить все посты из публичной страницы Telegram-канала.
-    days=0 означает «все посты», иначе — за последние N дней."""
-    channel_stat = await tgstat_request("channels/stat")
-    channel_info = await tgstat_request("channels/get")
+    days=0 означает «все посты», иначе — за последние N дней.
+    TGStat не обязателен — если API недоступен, посты всё равно загрузятся."""
+
+    channel_stat = {}
+    channel_title = "MOST"
+    try:
+        channel_stat = await tgstat_request("channels/stat")
+        info = await tgstat_request("channels/get")
+        channel_title = info.get("title", "MOST")
+    except Exception:
+        pass
 
     all_posts = await _scrape_telegram_channel(CHANNEL_ID)
 
@@ -374,7 +382,7 @@ async def collect_history(days: int = Query(0)):
             channel_stat.get("daily_reach", 0),
             channel_stat.get("ci_index", 0),
             len(all_posts),
-            channel_info.get("title", "MOST"),
+            channel_title,
             "{}"
         ))
         snapshot_id = cur.lastrowid
@@ -396,7 +404,8 @@ async def collect_history(days: int = Query(0)):
         "status": "ok",
         "days_collected": days if days > 0 else "all",
         "posts_collected": len(all_posts),
-        "snapshot_id": snapshot_id
+        "snapshot_id": snapshot_id,
+        "tgstat_available": bool(channel_stat)
     }
 
 
@@ -408,8 +417,14 @@ async def upload_posts(request: Request):
     if not posts_data:
         raise HTTPException(400, "Нет постов в запросе")
 
-    channel_stat = await tgstat_request("channels/stat")
-    channel_info = await tgstat_request("channels/get")
+    channel_stat = {}
+    channel_title = "MOST"
+    try:
+        channel_stat = await tgstat_request("channels/stat")
+        info = await tgstat_request("channels/get")
+        channel_title = info.get("title", "MOST")
+    except Exception:
+        pass
     collected_at = datetime.utcnow().isoformat()
 
     with get_db() as conn:
@@ -425,7 +440,7 @@ async def upload_posts(request: Request):
             channel_stat.get("daily_reach", 0),
             channel_stat.get("ci_index", 0),
             len(posts_data),
-            channel_info.get("title", "MOST"),
+            channel_title,
             "{}"
         ))
         snapshot_id = cur.lastrowid
