@@ -1,0 +1,438 @@
+{
+  "name": "MOST Weekly Analytics Report",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000002",
+      "name": "Schedule: Monday 9AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 100],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "most-report",
+        "options": {
+          "responseMode": "lastNode"
+        }
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000012",
+      "name": "Webhook: On Demand",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 500],
+      "webhookId": "most-report-webhook",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "var-channel",
+              "name": "channel_id",
+              "value": "={{ $env.MOST_CHANNEL_ID || '@YOUR_CHANNEL' }}",
+              "type": "string"
+            },
+            {
+              "id": "var-token",
+              "name": "tgstat_token",
+              "value": "={{ $env.TGSTAT_TOKEN || 'YOUR_TOKEN' }}",
+              "type": "string"
+            },
+            {
+              "id": "var-start",
+              "name": "period_start",
+              "value": "={{ Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000) }}",
+              "type": "number"
+            },
+            {
+              "id": "var-end",
+              "name": "period_end",
+              "value": "={{ Math.floor(Date.now() / 1000) }}",
+              "type": "number"
+            },
+            {
+              "id": "var-chatid",
+              "name": "report_chat_id",
+              "value": "={{ $env.MOST_REPORT_CHAT_ID || 'YOUR_CHAT_ID' }}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000003",
+      "name": "Set Variables",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [250, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.tgstat.ru/channels/get",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "={{ $json.tgstat_token }}"
+            },
+            {
+              "name": "channelId",
+              "value": "={{ $json.channel_id }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000004",
+      "name": "TGStat: Channel Info",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 100],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.tgstat.ru/channels/stat",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "={{ $('Set Variables').item.json.tgstat_token }}"
+            },
+            {
+              "name": "channelId",
+              "value": "={{ $('Set Variables').item.json.channel_id }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000005",
+      "name": "TGStat: Channel Stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 300],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000006",
+      "name": "Merge Info+Stats",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [750, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.tgstat.ru/channels/posts",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "={{ $('Set Variables').item.json.tgstat_token }}"
+            },
+            {
+              "name": "channelId",
+              "value": "={{ $('Set Variables').item.json.channel_id }}"
+            },
+            {
+              "name": "startTime",
+              "value": "={{ $('Set Variables').item.json.period_start }}"
+            },
+            {
+              "name": "endTime",
+              "value": "={{ $('Set Variables').item.json.period_end }}"
+            },
+            {
+              "name": "limit",
+              "value": "50"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000007",
+      "name": "TGStat: Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 200],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Агрегация данных TGStat для GPT-анализа\n\nconst vars = $('Set Variables').first().json;\nconst channelInfo = $('TGStat: Channel Info').first().json;\nconst channelStats = $('TGStat: Channel Stats').first().json;\nconst postsData = $('TGStat: Posts').first().json;\n\n// Извлечь данные из ответов TGStat\nconst info = channelInfo.response || channelInfo;\nconst stats = channelStats.response || channelStats;\nconst posts = (postsData.response?.items || postsData.items || []);\n\n// Подсчёт метрик постов\nconst postsCount = posts.length;\nconst totalViews = posts.reduce((sum, p) => sum + (p.views || 0), 0);\nconst avgViews = postsCount > 0 ? Math.round(totalViews / postsCount) : 0;\n\n// Топ-5 по просмотрам\nconst topPosts = [...posts]\n  .sort((a, b) => (b.views || 0) - (a.views || 0))\n  .slice(0, 5)\n  .map(p => ({\n    link: p.link || '',\n    views: p.views || 0,\n    date: p.date ? new Date(p.date * 1000).toISOString().split('T')[0] : 'unknown',\n    text_preview: (p.text || '').substring(0, 120),\n    forwards: p.forwards_count || p.forwards || 0,\n    reactions: p.reactions_count || 0\n  }));\n\n// Определить тренд по просмотрам (первая vs вторая половина недели)\nlet trend = 'stable';\nif (posts.length >= 4) {\n  const mid = Math.floor(posts.length / 2);\n  const sorted = [...posts].sort((a, b) => (a.date || 0) - (b.date || 0));\n  const firstHalf = sorted.slice(0, mid);\n  const secondHalf = sorted.slice(mid);\n  const avgFirst = firstHalf.reduce((s, p) => s + (p.views || 0), 0) / firstHalf.length;\n  const avgSecond = secondHalf.reduce((s, p) => s + (p.views || 0), 0) / secondHalf.length;\n  if (avgSecond > avgFirst * 1.1) trend = 'up';\n  else if (avgSecond < avgFirst * 0.9) trend = 'down';\n}\n\n// Период\nconst startDate = new Date(vars.period_start * 1000).toISOString().split('T')[0];\nconst endDate = new Date(vars.period_end * 1000).toISOString().split('T')[0];\n\nconst aggregated = {\n  period: `${startDate} — ${endDate}`,\n  channel: {\n    title: info.title || info.channel_name || 'MOST',\n    username: info.username || vars.channel_id,\n    participants_count: stats.participants_count || info.participants_count || 0,\n    avg_post_reach: stats.avg_post_reach || avgViews,\n    err_percent: stats.err_percent || (stats.participants_count ? Math.round(avgViews / stats.participants_count * 100 * 10) / 10 : 0),\n    daily_reach: stats.daily_reach || 0,\n    ci_index: stats.ci_index || 0\n  },\n  posts_count: postsCount,\n  total_views: totalViews,\n  avg_views: avgViews,\n  top_posts: topPosts,\n  metrics_trend: trend\n};\n\nreturn [{ json: { aggregated_data: aggregated, aggregated_json: JSON.stringify(aggregated, null, 2) } }];"
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000008",
+      "name": "Code: Aggregate Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"temperature\": 0.4,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Ты — аналитик Telegram-каналов. Ты получаешь JSON со статистикой канала MOST за период. Твоя задача: выявить тренды, дать практические рекомендации, выделить лучший контент. Пиши кратко, по делу, на русском. Используй цифры из данных. Формат — Markdown.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Проанализируй данные и сформируй еженедельный отчёт по структуре:\\n1. Ключевые метрики (3-5 предложений)\\n2. Динамика: что выросло/упало\\n3. Топ-3 поста недели и почему они сработали\\n4. Рекомендации на следующую неделю (2-3 пункта)\\n5. Риски или моменты внимания\\n\\nДанные:\\n{{ $json.aggregated_json }}\"\n    }\n  ]\n}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000009",
+      "name": "OpenAI: Analyze",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1500, 200],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "openai-header-auth",
+          "name": "OpenAI API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Сборка финального отчёта\n\nconst data = $('Code: Aggregate Data').first().json.aggregated_data;\nconst gptResponse = $('OpenAI: Analyze').first().json;\nconst gptText = gptResponse.choices?.[0]?.message?.content || 'GPT-анализ недоступен';\n\nconst ch = data.channel;\nconst period = data.period;\n\n// Форматирование числа с разделителями\nconst fmt = (n) => n ? n.toLocaleString('ru-RU') : '0';\n\nlet report = `📊 *Еженедельный отчёт MOST*\\n`;\nreport += `📅 ${period}\\n\\n`;\n\nreport += `*Ключевые метрики*\\n`;\nreport += `👥 Подписчики: ${fmt(ch.participants_count)}\\n`;\nreport += `👁 Средний охват поста: ${fmt(ch.avg_post_reach)}\\n`;\nreport += `📈 ERR: ${ch.err_percent}%\\n`;\nreport += `📝 Постов за неделю: ${data.posts_count}\\n`;\nreport += `👀 Всего просмотров: ${fmt(data.total_views)}\\n`;\nreport += `📊 Тренд: ${data.metrics_trend === 'up' ? '↗️ рост' : data.metrics_trend === 'down' ? '↘️ снижение' : '➡️ стабильно'}\\n\\n`;\n\nreport += `---\\n\\n`;\nreport += gptText;\nreport += `\\n\\n---\\n_Отчёт сгенерирован автоматически_`;\n\nreturn [{ json: { report_text: report, report_chat_id: $('Set Variables').first().json.report_chat_id } }];"
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000010",
+      "name": "Code: Format Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1750, 200]
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $json.report_chat_id }}",
+        "text": "={{ $json.report_text }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000011",
+      "name": "Telegram: Send Report",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2000, 200],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-bot-cred",
+          "name": "MOST Report Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule: Monday 9AM": {
+      "main": [
+        [
+          {
+            "node": "Set Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook: On Demand": {
+      "main": [
+        [
+          {
+            "node": "Set Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Variables": {
+      "main": [
+        [
+          {
+            "node": "TGStat: Channel Info",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "TGStat: Channel Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TGStat: Channel Info": {
+      "main": [
+        [
+          {
+            "node": "Merge Info+Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TGStat: Channel Stats": {
+      "main": [
+        [
+          {
+            "node": "Merge Info+Stats",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Info+Stats": {
+      "main": [
+        [
+          {
+            "node": "TGStat: Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TGStat: Posts": {
+      "main": [
+        [
+          {
+            "node": "Code: Aggregate Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Aggregate Data": {
+      "main": [
+        [
+          {
+            "node": "OpenAI: Analyze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI: Analyze": {
+      "main": [
+        [
+          {
+            "node": "Code: Format Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Format Report": {
+      "main": [
+        [
+          {
+            "node": "Telegram: Send Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "analytics"
+    },
+    {
+      "name": "MOST"
+    }
+  ]
+}

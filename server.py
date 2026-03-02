@@ -13,10 +13,11 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from contextlib import contextmanager
 
+import secrets
 import httpx
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request, Response, Depends, Cookie
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
@@ -25,11 +26,54 @@ load_dotenv()
 TGSTAT_TOKEN = os.getenv("TGSTAT_TOKEN", "")
 CHANNEL_ID = os.getenv("MOST_CHANNEL_ID", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "")
 TGSTAT_BASE = "https://api.tgstat.ru"
 DB_PATH = Path(__file__).parent / "analytics.db"
 
 app = FastAPI(title="MOST Analytics")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+VALID_TOKENS: set[str] = set()
+
+LOGIN_HTML = """<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MOST Analytics — Вход</title><style>
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,system-ui,sans-serif;background:#0f1117;color:#e1e4ed;display:flex;align-items:center;justify-content:center;min-height:100vh}
+.card{background:#1a1d27;border:1px solid #2e3348;border-radius:16px;padding:40px;width:340px;text-align:center}
+h1{font-size:22px;margin-bottom:8px;background:linear-gradient(135deg,#6c5ce7,#a29bfe);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+p{color:#8b90a5;font-size:14px;margin-bottom:24px}
+input{width:100%;padding:12px;background:#232736;border:1px solid #2e3348;border-radius:8px;color:#e1e4ed;font-size:15px;margin-bottom:12px;text-align:center}
+input:focus{outline:none;border-color:#6c5ce7}
+button{width:100%;padding:12px;background:#6c5ce7;border:none;border-radius:8px;color:#fff;font-size:15px;cursor:pointer}
+button:hover{background:#5a4bd4}.err{color:#e17055;font-size:13px;margin-bottom:12px}
+</style></head><body><div class="card"><h1>MOST Analytics</h1><p>Введите пароль для доступа</p>
+<form method="POST" action="/login">ERR_PLACEHOLDER<input type="password" name="password" placeholder="Пароль" autofocus>
+<button type="submit">Войти</button></form></div></body></html>"""
+
+@app.post("/login")
+async def login(request: Request):
+    form = await request.form()
+    pw = form.get("password", "")
+    if pw == DASHBOARD_PASSWORD:
+        token = secrets.token_hex(32)
+        VALID_TOKENS.add(token)
+        resp = RedirectResponse("/", status_code=302)
+        resp.set_cookie("session", token, httponly=True, max_age=86400 * 7)
+        return resp
+    html = LOGIN_HTML.replace("ERR_PLACEHOLDER", '<div class="err">Неверный пароль</div>')
+    return HTMLResponse(html, status_code=401)
+
+def check_auth(request: Request):
+    if not DASHBOARD_PASSWORD:
+        return
+    token = request.cookies.get("session", "")
+    if token not in VALID_TOKENS:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+@app.get("/login")
+def login_page():
+    if not DASHBOARD_PASSWORD:
+        return RedirectResponse("/")
+    return HTMLResponse(LOGIN_HTML.replace("ERR_PLACEHOLDER", ""))
 
 
 # ── Database ──────────────────────────────────────────────────────────
@@ -114,7 +158,7 @@ async def tgstat_request(endpoint: str, params: dict = None) -> dict:
 
 # ── Data Collection ───────────────────────────────────────────────────
 
-@app.post("/api/collect")
+@app.post("/api/collect", dependencies=[Depends(check_auth)])
 async def collect_data():
     """Собрать свежие данные с TGStat и сохранить в SQLite."""
     channel_info = await tgstat_request("channels/get")
@@ -187,7 +231,7 @@ async def collect_data():
 
 # ── Data Retrieval ────────────────────────────────────────────────────
 
-@app.get("/api/snapshots")
+@app.get("/api/snapshots", dependencies=[Depends(check_auth)])
 def get_snapshots(limit: int = 100):
     """Все снэпшоты (история сборов)."""
     with get_db() as conn:
@@ -199,7 +243,7 @@ def get_snapshots(limit: int = 100):
     return [dict(r) for r in rows]
 
 
-@app.get("/api/posts")
+@app.get("/api/posts", dependencies=[Depends(check_auth)])
 def get_posts(
     days: int = Query(30, description="За сколько дней"),
     sort: str = Query("views", description="Сортировка: views, date, forwards, reactions"),
@@ -220,7 +264,7 @@ def get_posts(
     return [dict(r) for r in rows]
 
 
-@app.get("/api/metrics")
+@app.get("/api/metrics", dependencies=[Depends(check_auth)])
 def get_metrics_history():
     """Временной ряд ключевых метрик (для графиков)."""
     with get_db() as conn:
@@ -231,7 +275,7 @@ def get_metrics_history():
     return [dict(r) for r in rows]
 
 
-@app.get("/api/top-posts")
+@app.get("/api/top-posts", dependencies=[Depends(check_auth)])
 def get_top_posts(days: int = 30, limit: int = 10):
     """Топ постов по просмотрам за период."""
     cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
@@ -246,7 +290,7 @@ def get_top_posts(days: int = 30, limit: int = 10):
 
 # ── GPT Analysis ──────────────────────────────────────────────────────
 
-@app.post("/api/analyze")
+@app.post("/api/analyze", dependencies=[Depends(check_auth)])
 async def run_analysis(days: int = Query(7), depth: str = Query("standard")):
     """GPT-анализ с историческим контекстом."""
     if not OPENAI_API_KEY:
@@ -359,7 +403,7 @@ async def run_analysis(days: int = Query(7), depth: str = Query("standard")):
     }
 
 
-@app.get("/api/analyses")
+@app.get("/api/analyses", dependencies=[Depends(check_auth)])
 def get_analyses(limit: int = 20):
     """История всех GPT-анализов."""
     with get_db() as conn:
@@ -372,7 +416,7 @@ def get_analyses(limit: int = 20):
 
 # ── Export ────────────────────────────────────────────────────────────
 
-@app.get("/api/export/csv")
+@app.get("/api/export/csv", dependencies=[Depends(check_auth)])
 def export_csv(days: int = 30):
     """Экспорт постов в CSV."""
     import csv
@@ -401,7 +445,7 @@ def export_csv(days: int = 30):
     )
 
 
-@app.get("/api/export/report")
+@app.get("/api/export/report", dependencies=[Depends(check_auth)])
 async def export_report(days: int = 7):
     """Экспорт полного отчёта в Markdown."""
     analysis = await run_analysis(days=days, depth="standard")
@@ -444,5 +488,9 @@ def health():
 # ── Serve Frontend ────────────────────────────────────────────────────
 
 @app.get("/")
-def serve_index():
+def serve_index(request: Request):
+    if DASHBOARD_PASSWORD:
+        token = request.cookies.get("session", "")
+        if token not in VALID_TOKENS:
+            return RedirectResponse("/login")
     return FileResponse(Path(__file__).parent / "index.html")

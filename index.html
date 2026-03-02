@@ -420,6 +420,7 @@ function initTabs() {
 // ── API calls ──
 async function api(path, opts = {}) {
     const resp = await fetch(API + path, opts);
+    if (resp.status === 401) { window.location.href = '/login'; return; }
     if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         throw new Error(err.detail || resp.statusText);

@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: most-analytics
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: TGSTAT_TOKEN
+        sync: false
+      - key: MOST_CHANNEL_ID
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
