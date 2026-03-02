@@ -250,7 +250,12 @@ async def _scrape_telegram_channel(username: str, max_pages: int = 30):
     all_posts = []
     before = None
 
-    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9,ru;q=0.8",
+    }
+    async with httpx.AsyncClient(timeout=15, follow_redirects=True, headers=headers) as client:
         for _ in range(max_pages):
             url = f"https://t.me/s/{clean}"
             if before:
@@ -260,6 +265,8 @@ async def _scrape_telegram_channel(username: str, max_pages: int = 30):
 
             post_ids = _re.findall(rf'data-post="{clean}/(\d+)"', html)
             if not post_ids:
+                if not all_posts:
+                    print(f"[scraper] No posts found on page. Status={resp.status_code}, len={len(html)}, url={url}")
                 break
 
             dates = _re.findall(r'datetime="([^"]+)"', html)
@@ -352,6 +359,49 @@ async def collect_history(days: int = Query(0)):
         "posts_collected": len(all_posts),
         "snapshot_id": snapshot_id
     }
+
+
+@app.post("/api/upload-posts", dependencies=[Depends(check_auth)])
+async def upload_posts(request: Request):
+    """Принять список постов JSON (fallback если скрейпер не работает с сервера)."""
+    body = await request.json()
+    posts_data = body.get("posts", [])
+    if not posts_data:
+        raise HTTPException(400, "Нет постов в запросе")
+
+    channel_stat = await tgstat_request("channels/stat")
+    channel_info = await tgstat_request("channels/get")
+    collected_at = datetime.utcnow().isoformat()
+
+    with get_db() as conn:
+        cur = conn.execute("""
+            INSERT INTO snapshots (collected_at, participants, avg_reach, err_percent,
+                daily_reach, ci_index, posts_count, channel_title, raw_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            collected_at,
+            channel_stat.get("participants_count", 0),
+            channel_stat.get("avg_post_reach", 0),
+            channel_stat.get("err_percent", 0),
+            channel_stat.get("daily_reach", 0),
+            channel_stat.get("ci_index", 0),
+            len(posts_data),
+            channel_info.get("title", "MOST"),
+            "{}"
+        ))
+        snapshot_id = cur.lastrowid
+        for p in posts_data:
+            conn.execute("""
+                INSERT OR REPLACE INTO posts
+                    (post_id, snapshot_id, date, text, views, forwards, reactions, shares, link)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                str(p.get("post_id", "")), snapshot_id, p.get("date", ""),
+                (p.get("text", ""))[:500], p.get("views", 0),
+                0, 0, 0, p.get("link", "")
+            ))
+
+    return {"status": "ok", "posts_uploaded": len(posts_data), "snapshot_id": snapshot_id}
 
 
 # ── Data Retrieval ────────────────────────────────────────────────────

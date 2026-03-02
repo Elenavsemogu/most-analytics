@@ -477,19 +477,70 @@ async function collectData() {
     }
 }
 
+async function scrapeFromBrowser(channel, days) {
+    const clean = channel.replace('@', '');
+    const allPosts = [];
+    let before = null;
+    for (let page = 0; page < 30; page++) {
+        let url = `https://t.me/s/${clean}`;
+        if (before) url += `?before=${before}`;
+        const resp = await fetch(url);
+        const html = await resp.text();
+        const postIds = [...html.matchAll(new RegExp(`data-post="${clean}/(\\d+)"`, 'g'))].map(m => m[1]);
+        if (!postIds.length) break;
+        const viewsRaw = [...html.matchAll(/class="tgme_widget_message_views"[^>]*>([^<]+)/g)].map(m => m[1]);
+        const datesRaw = [...html.matchAll(/datetime="([^"]+)"/g)].map(m => m[1]);
+        const textsRaw = [...html.matchAll(/class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/g)].map(m => m[1]);
+        for (let i = 0; i < postIds.length; i++) {
+            const vt = (viewsRaw[i] || '0').trim().replace(/\s/g, '');
+            let views = 0;
+            if (vt.endsWith('K')) views = Math.round(parseFloat(vt) * 1000);
+            else if (vt.endsWith('M')) views = Math.round(parseFloat(vt) * 1000000);
+            else views = parseInt(vt) || 0;
+            allPosts.push({
+                post_id: postIds[i],
+                link: `https://t.me/${clean}/${postIds[i]}`,
+                date: datesRaw[i] || '',
+                views,
+                text: (textsRaw[i] || '').replace(/<[^>]+>/g, ' ').trim().substring(0, 500)
+            });
+        }
+        before = Math.min(...postIds.map(Number));
+        if (before <= 1) break;
+    }
+    if (days > 0) {
+        const cutoff = new Date(Date.now() - days * 86400000);
+        return allPosts.filter(p => !p.date || new Date(p.date) >= cutoff);
+    }
+    return allPosts;
+}
+
 async function collectHistory() {
-    const days = document.getElementById('historyDays').value;
+    const days = parseInt(document.getElementById('historyDays').value);
     const btn = document.getElementById('historyBtn');
     btn.disabled = true;
-    const label = days === '0' ? 'всех постов' : days + ' дн';
+    const label = days === 0 ? 'всех постов' : days + ' дн';
     btn.innerHTML = '<span class="loader"></span> Загрузка ' + label + '...';
     try {
         const res = await api('/api/collect-history?days=' + days, { method: 'POST' });
-        btn.innerHTML = `Готово! ${res.posts_collected} постов`;
+        if (res.posts_collected > 0) {
+            btn.innerHTML = `Готово! ${res.posts_collected} постов`;
+            setTimeout(() => { btn.innerHTML = 'Загрузить историю'; btn.disabled = false; }, 4000);
+            loadSnapshots(); loadMetrics(); loadPosts();
+            return;
+        }
+        btn.innerHTML = '<span class="loader"></span> Скрейпинг из браузера...';
+        const posts = await scrapeFromBrowser('@mostcareer', days);
+        if (!posts.length) throw new Error('Не удалось загрузить посты');
+        btn.innerHTML = `<span class="loader"></span> Загрузка ${posts.length} постов...`;
+        const up = await api('/api/upload-posts', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ posts })
+        });
+        btn.innerHTML = `Готово! ${up.posts_uploaded} постов`;
         setTimeout(() => { btn.innerHTML = 'Загрузить историю'; btn.disabled = false; }, 4000);
-        loadSnapshots();
-        loadMetrics();
-        loadPosts();
+        loadSnapshots(); loadMetrics(); loadPosts();
     } catch (e) {
         btn.innerHTML = 'Ошибка';
         btn.disabled = false;
