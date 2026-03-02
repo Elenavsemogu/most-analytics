@@ -7,6 +7,7 @@ FastAPI сервер: сбор данных TGStat, хранение в SQLite, 
 import os
 import json
 import time
+import asyncio
 import sqlite3
 import hashlib
 from datetime import datetime, timedelta
@@ -226,6 +227,87 @@ async def collect_data():
         "participants": channel_stat.get("participants_count", 0),
         "posts_collected": len(posts_list),
         "collected_at": collected_at
+    }
+
+
+@app.post("/api/collect-history", dependencies=[Depends(check_auth)])
+async def collect_history(days: int = Query(90)):
+    """Собрать все посты за последние N дней + текущий снэпшот."""
+    channel_info = await tgstat_request("channels/get")
+    channel_stat = await tgstat_request("channels/stat")
+
+    now = int(time.time())
+    all_posts = []
+
+    batch_days = 30
+    for offset_start in range(0, days, batch_days):
+        end_ts = now - offset_start * 86400
+        start_ts = now - min(offset_start + batch_days, days) * 86400
+        try:
+            batch = await tgstat_request("channels/posts", {
+                "startTime": str(start_ts),
+                "endTime": str(end_ts),
+                "limit": "50"
+            })
+            items = batch if isinstance(batch, list) else batch.get("items", [])
+            all_posts.extend(items)
+        except Exception:
+            pass
+        await asyncio.sleep(1)
+
+    seen = set()
+    unique_posts = []
+    for p in all_posts:
+        pid = p.get("id") or p.get("link", "")
+        if pid not in seen:
+            seen.add(pid)
+            unique_posts.append(p)
+
+    collected_at = datetime.utcnow().isoformat()
+    with get_db() as conn:
+        cur = conn.execute("""
+            INSERT INTO snapshots (collected_at, participants, avg_reach, err_percent,
+                daily_reach, ci_index, posts_count, channel_title, raw_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            collected_at,
+            channel_stat.get("participants_count", 0),
+            channel_stat.get("avg_post_reach", 0),
+            channel_stat.get("err_percent", 0),
+            channel_stat.get("daily_reach", 0),
+            channel_stat.get("ci_index", 0),
+            len(unique_posts),
+            channel_info.get("title", "MOST"),
+            "{}"
+        ))
+        snapshot_id = cur.lastrowid
+
+        for p in unique_posts:
+            post_id = p.get("id") or hashlib.md5(
+                (p.get("link", "") + str(p.get("date", ""))).encode()
+            ).hexdigest()
+            date_val = p.get("date", "")
+            if isinstance(date_val, (int, float)):
+                date_val = datetime.utcfromtimestamp(date_val).isoformat()
+            conn.execute("""
+                INSERT OR REPLACE INTO posts
+                    (post_id, snapshot_id, date, text, views, forwards, reactions, shares, link)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                str(post_id), snapshot_id, date_val,
+                (p.get("text") or "")[:500],
+                p.get("views", 0),
+                p.get("forwards_count", p.get("forwards", 0)),
+                p.get("reactions_count", 0),
+                p.get("shares_count", p.get("shares", 0)),
+                p.get("link", "")
+            ))
+
+    return {
+        "status": "ok",
+        "days_collected": days,
+        "posts_collected": len(unique_posts),
+        "snapshot_id": snapshot_id
     }
 
 
