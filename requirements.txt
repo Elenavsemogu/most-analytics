@@ -3,3 +3,4 @@ uvicorn[standard]
 httpx
 python-dotenv
 python-multipart
+psycopg2-binary

@@ -1,6 +1,6 @@
 """
 MOST Analytics Dashboard — Backend
-FastAPI сервер: сбор данных TGStat, хранение в SQLite, GPT-анализ.
+FastAPI + PostgreSQL (Supabase) / SQLite fallback, TGStat, GPT-анализ.
 Запуск: uvicorn server:app --reload --port 8090
 """
 
@@ -22,6 +22,12 @@ from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse, Red
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+except ImportError:
+    psycopg2 = None
+
 load_dotenv()
 
 TGSTAT_TOKEN = os.getenv("TGSTAT_TOKEN", "")
@@ -29,6 +35,7 @@ CHANNEL_ID = os.getenv("MOST_CHANNEL_ID", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "")
 CRON_SECRET = os.getenv("CRON_SECRET", "mostsecret2026")
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 TGSTAT_BASE = "https://api.tgstat.ru"
 DB_PATH = Path(__file__).parent / "analytics.db"
 
@@ -82,56 +89,91 @@ def login_page():
 
 # ── Database ──────────────────────────────────────────────────────────
 
+class _DbConn:
+    """Unified wrapper: psycopg2 (Supabase) or sqlite3. Converts ? → %s for PG."""
+
+    def __init__(self, conn, is_pg=False):
+        self._conn = conn
+        self._pg = is_pg
+
+    def execute(self, query, params=None):
+        if self._pg:
+            query = query.replace("?", "%s")
+            cur = self._conn.cursor()
+            cur.execute(query, params or ())
+            return cur
+        return self._conn.execute(query, params or ())
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, *_):
+        try:
+            if exc_type is None:
+                self.commit()
+            else:
+                self._conn.rollback()
+        finally:
+            self.close()
+        return False
+
+
 def get_db():
+    if DATABASE_URL and psycopg2:
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        return _DbConn(conn, is_pg=True)
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
-    return conn
+    return _DbConn(conn, is_pg=False)
 
 
-def init_db():
-    with get_db() as conn:
-        conn.executescript("""
-            CREATE TABLE IF NOT EXISTS snapshots (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                collected_at TEXT NOT NULL,
-                participants INTEGER,
-                avg_reach INTEGER,
-                err_percent REAL,
-                daily_reach INTEGER,
-                ci_index REAL,
-                posts_count INTEGER,
-                channel_title TEXT,
-                raw_json TEXT
-            );
-            CREATE TABLE IF NOT EXISTS posts (
-                id INTEGER PRIMARY KEY,
-                post_id TEXT UNIQUE,
-                snapshot_id INTEGER,
-                date TEXT,
-                text TEXT,
-                views INTEGER DEFAULT 0,
-                forwards INTEGER DEFAULT 0,
-                reactions INTEGER DEFAULT 0,
-                shares INTEGER DEFAULT 0,
-                link TEXT,
-                FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
-            );
-            CREATE TABLE IF NOT EXISTS analyses (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                created_at TEXT NOT NULL,
-                period_start TEXT,
-                period_end TEXT,
-                analysis_type TEXT DEFAULT 'weekly',
-                gpt_response TEXT,
-                snapshots_used TEXT
-            );
-            CREATE INDEX IF NOT EXISTS idx_snapshots_date ON snapshots(collected_at);
-            CREATE INDEX IF NOT EXISTS idx_posts_date ON posts(date);
-            CREATE INDEX IF NOT EXISTS idx_posts_views ON posts(views);
-        """)
+def _init_sqlite():
+    if DATABASE_URL and psycopg2:
+        return
+    c = sqlite3.connect(str(DB_PATH))
+    c.executescript("""
+        CREATE TABLE IF NOT EXISTS snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, collected_at TEXT NOT NULL,
+            participants INTEGER, avg_reach INTEGER, err_percent REAL,
+            daily_reach INTEGER, ci_index REAL, posts_count INTEGER,
+            channel_title TEXT, raw_json TEXT);
+        CREATE TABLE IF NOT EXISTS posts (
+            id INTEGER PRIMARY KEY, post_id TEXT UNIQUE, snapshot_id INTEGER,
+            date TEXT, text TEXT, views INTEGER DEFAULT 0, forwards INTEGER DEFAULT 0,
+            reactions INTEGER DEFAULT 0, shares INTEGER DEFAULT 0, link TEXT);
+        CREATE TABLE IF NOT EXISTS analyses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL,
+            period_start TEXT, period_end TEXT, analysis_type TEXT DEFAULT 'weekly',
+            gpt_response TEXT, snapshots_used TEXT);
+        CREATE INDEX IF NOT EXISTS idx_snapshots_date ON snapshots(collected_at);
+        CREATE INDEX IF NOT EXISTS idx_posts_date ON posts(date);
+        CREATE INDEX IF NOT EXISTS idx_posts_views ON posts(views);
+    """)
+    c.close()
 
-init_db()
+_init_sqlite()
+
+UPSERT_POST = """INSERT INTO posts (post_id, snapshot_id, date, text, views, forwards, reactions, shares, link)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (post_id) DO UPDATE SET
+    snapshot_id=EXCLUDED.snapshot_id, date=EXCLUDED.date, text=EXCLUDED.text,
+    views=EXCLUDED.views, forwards=EXCLUDED.forwards, reactions=EXCLUDED.reactions,
+    shares=EXCLUDED.shares, link=EXCLUDED.link"""
+
+IGNORE_POST = """INSERT INTO posts (post_id, snapshot_id, date, text, views, forwards, reactions, shares, link)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (post_id) DO NOTHING"""
+
+INSERT_SNAPSHOT = """INSERT INTO snapshots (collected_at, participants, avg_reach, err_percent,
+    daily_reach, ci_index, posts_count, channel_title, raw_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id"""
 
 
 # ── Post classifier ──────────────────────────────────────────────────
@@ -221,23 +263,16 @@ async def collect_data():
         "posts": posts_list
     }
 
+    snap_params = (
+        collected_at, channel_stat.get("participants_count", 0),
+        channel_stat.get("avg_post_reach", 0), channel_stat.get("err_percent", 0),
+        channel_stat.get("daily_reach", 0), channel_stat.get("ci_index", 0),
+        len(posts_list), channel_info.get("title", "MOST"),
+        json.dumps(raw, ensure_ascii=False))
+
     with get_db() as conn:
-        cur = conn.execute("""
-            INSERT INTO snapshots (collected_at, participants, avg_reach, err_percent,
-                daily_reach, ci_index, posts_count, channel_title, raw_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            collected_at,
-            channel_stat.get("participants_count", 0),
-            channel_stat.get("avg_post_reach", 0),
-            channel_stat.get("err_percent", 0),
-            channel_stat.get("daily_reach", 0),
-            channel_stat.get("ci_index", 0),
-            len(posts_list),
-            channel_info.get("title", "MOST"),
-            json.dumps(raw, ensure_ascii=False)
-        ))
-        snapshot_id = cur.lastrowid
+        row = conn.execute(INSERT_SNAPSHOT, snap_params).fetchone()
+        snapshot_id = row["id"] if isinstance(row, dict) else row[0]
 
         for p in posts_list:
             post_id = p.get("id") or hashlib.md5(
@@ -246,26 +281,18 @@ async def collect_data():
             date_val = p.get("date", "")
             if isinstance(date_val, (int, float)):
                 date_val = datetime.utcfromtimestamp(date_val).isoformat()
-            conn.execute("""
-                INSERT OR REPLACE INTO posts
-                    (post_id, snapshot_id, date, text, views, forwards, reactions, shares, link)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
+            conn.execute(UPSERT_POST, (
                 str(post_id), snapshot_id, date_val,
-                (p.get("text") or "")[:500],
-                p.get("views", 0),
+                (p.get("text") or "")[:500], p.get("views", 0),
                 p.get("forwards_count", p.get("forwards", 0)),
                 p.get("reactions_count", 0),
                 p.get("shares_count", p.get("shares", 0)),
-                p.get("link", "")
-            ))
+                p.get("link", "")))
 
     return {
-        "status": "ok",
-        "snapshot_id": snapshot_id,
+        "status": "ok", "snapshot_id": snapshot_id,
         "participants": channel_stat.get("participants_count", 0),
-        "posts_collected": len(posts_list),
-        "collected_at": collected_at
+        "posts_collected": len(posts_list), "collected_at": collected_at
     }
 
 
@@ -369,42 +396,24 @@ async def collect_history(days: int = Query(0)):
         all_posts = filtered
 
     collected_at = datetime.utcnow().isoformat()
+    snap_params = (
+        collected_at, channel_stat.get("participants_count", 0),
+        channel_stat.get("avg_post_reach", 0), channel_stat.get("err_percent", 0),
+        channel_stat.get("daily_reach", 0), channel_stat.get("ci_index", 0),
+        len(all_posts), channel_title, "{}")
+
     with get_db() as conn:
-        cur = conn.execute("""
-            INSERT INTO snapshots (collected_at, participants, avg_reach, err_percent,
-                daily_reach, ci_index, posts_count, channel_title, raw_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            collected_at,
-            channel_stat.get("participants_count", 0),
-            channel_stat.get("avg_post_reach", 0),
-            channel_stat.get("err_percent", 0),
-            channel_stat.get("daily_reach", 0),
-            channel_stat.get("ci_index", 0),
-            len(all_posts),
-            channel_title,
-            "{}"
-        ))
-        snapshot_id = cur.lastrowid
+        row = conn.execute(INSERT_SNAPSHOT, snap_params).fetchone()
+        snapshot_id = row["id"] if isinstance(row, dict) else row[0]
 
         for p in all_posts:
-            conn.execute("""
-                INSERT OR REPLACE INTO posts
-                    (post_id, snapshot_id, date, text, views, forwards, reactions, shares, link)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
+            conn.execute(UPSERT_POST, (
                 str(p["post_id"]), snapshot_id, p["date"],
-                p["text"],
-                p["views"],
-                0, 0, 0,
-                p["link"]
-            ))
+                p["text"], p["views"], 0, 0, 0, p["link"]))
 
     return {
-        "status": "ok",
-        "days_collected": days if days > 0 else "all",
-        "posts_collected": len(all_posts),
-        "snapshot_id": snapshot_id,
+        "status": "ok", "days_collected": days if days > 0 else "all",
+        "posts_collected": len(all_posts), "snapshot_id": snapshot_id,
         "tgstat_available": bool(channel_stat)
     }
 
@@ -427,33 +436,20 @@ async def upload_posts(request: Request):
         pass
     collected_at = datetime.utcnow().isoformat()
 
+    snap_params = (
+        collected_at, channel_stat.get("participants_count", 0),
+        channel_stat.get("avg_post_reach", 0), channel_stat.get("err_percent", 0),
+        channel_stat.get("daily_reach", 0), channel_stat.get("ci_index", 0),
+        len(posts_data), channel_title, "{}")
+
     with get_db() as conn:
-        cur = conn.execute("""
-            INSERT INTO snapshots (collected_at, participants, avg_reach, err_percent,
-                daily_reach, ci_index, posts_count, channel_title, raw_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            collected_at,
-            channel_stat.get("participants_count", 0),
-            channel_stat.get("avg_post_reach", 0),
-            channel_stat.get("err_percent", 0),
-            channel_stat.get("daily_reach", 0),
-            channel_stat.get("ci_index", 0),
-            len(posts_data),
-            channel_title,
-            "{}"
-        ))
-        snapshot_id = cur.lastrowid
+        row = conn.execute(INSERT_SNAPSHOT, snap_params).fetchone()
+        snapshot_id = row["id"] if isinstance(row, dict) else row[0]
         for p in posts_data:
-            conn.execute("""
-                INSERT OR REPLACE INTO posts
-                    (post_id, snapshot_id, date, text, views, forwards, reactions, shares, link)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
+            conn.execute(UPSERT_POST, (
                 str(p.get("post_id", "")), snapshot_id, p.get("date", ""),
                 (p.get("text", ""))[:500], p.get("views", 0),
-                0, 0, 0, p.get("link", "")
-            ))
+                0, 0, 0, p.get("link", "")))
 
     return {"status": "ok", "posts_uploaded": len(posts_data), "snapshot_id": snapshot_id}
 
@@ -690,11 +686,11 @@ async def run_analysis(days: int = Query(7), depth: str = Query("standard")):
     period_start = (datetime.utcnow() - timedelta(days=days)).isoformat()
 
     with get_db() as conn:
-        conn.execute("""
-            INSERT INTO analyses (created_at, period_start, period_end, analysis_type, gpt_response, snapshots_used)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (now, period_start, now, depth, gpt_text,
-              json.dumps([s["id"] for s in snapshots])))
+        conn.execute(
+            "INSERT INTO analyses (created_at, period_start, period_end, analysis_type, gpt_response, snapshots_used) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (now, period_start, now, depth, gpt_text,
+             json.dumps([s["id"] for s in snapshots])))
 
     return {
         "analysis": gpt_text,
@@ -889,23 +885,16 @@ async def cron_daily(request: Request):
         posts_list = posts_data if isinstance(posts_data, list) else posts_data.get("items", [])
 
         collected_at = datetime.utcnow().isoformat()
+        snap_params = (
+            collected_at, channel_stat.get("participants_count", 0),
+            channel_stat.get("avg_post_reach", 0), channel_stat.get("err_percent", 0),
+            channel_stat.get("daily_reach", 0), channel_stat.get("ci_index", 0),
+            len(posts_list), channel_info.get("title", "MOST"),
+            json.dumps({"channel_stat": channel_stat}, ensure_ascii=False))
+
         with get_db() as conn:
-            cur = conn.execute("""
-                INSERT INTO snapshots (collected_at, participants, avg_reach, err_percent,
-                    daily_reach, ci_index, posts_count, channel_title, raw_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                collected_at,
-                channel_stat.get("participants_count", 0),
-                channel_stat.get("avg_post_reach", 0),
-                channel_stat.get("err_percent", 0),
-                channel_stat.get("daily_reach", 0),
-                channel_stat.get("ci_index", 0),
-                len(posts_list),
-                channel_info.get("title", "MOST"),
-                json.dumps({"channel_stat": channel_stat}, ensure_ascii=False)
-            ))
-            snapshot_id = cur.lastrowid
+            row = conn.execute(INSERT_SNAPSHOT, snap_params).fetchone()
+            snapshot_id = row["id"] if isinstance(row, dict) else row[0]
 
             for p in posts_list:
                 post_id = p.get("id") or hashlib.md5(
@@ -914,19 +903,13 @@ async def cron_daily(request: Request):
                 date_val = p.get("date", "")
                 if isinstance(date_val, (int, float)):
                     date_val = datetime.utcfromtimestamp(date_val).isoformat()
-                conn.execute("""
-                    INSERT OR REPLACE INTO posts
-                        (post_id, snapshot_id, date, text, views, forwards, reactions, shares, link)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
+                conn.execute(UPSERT_POST, (
                     str(post_id), snapshot_id, date_val,
-                    (p.get("text") or "")[:500],
-                    p.get("views", 0),
+                    (p.get("text") or "")[:500], p.get("views", 0),
                     p.get("forwards_count", p.get("forwards", 0)),
                     p.get("reactions_count", 0),
                     p.get("shares_count", p.get("shares", 0)),
-                    p.get("link", "")
-                ))
+                    p.get("link", "")))
 
         results["tgstat"] = {"ok": True, "snapshot_id": snapshot_id, "posts": len(posts_list)}
     except Exception as e:
@@ -939,11 +922,9 @@ async def cron_daily(request: Request):
             with get_db() as conn:
                 for p in scraped:
                     try:
-                        conn.execute("""
-                            INSERT OR IGNORE INTO posts
-                                (post_id, snapshot_id, date, text, views, forwards, reactions, shares, link)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, (str(p["post_id"]), 0, p["date"], p["text"], p["views"], 0, 0, 0, p["link"]))
+                        conn.execute(IGNORE_POST, (
+                            str(p["post_id"]), 0, p["date"], p["text"],
+                            p["views"], 0, 0, 0, p["link"]))
                         new_count += 1
                     except Exception:
                         pass
@@ -962,14 +943,16 @@ def health():
         last_snap = conn.execute(
             "SELECT collected_at FROM snapshots ORDER BY collected_at DESC LIMIT 1"
         ).fetchone()
+    last_ts = None
+    if last_snap:
+        last_ts = last_snap["collected_at"] if isinstance(last_snap, dict) else dict(last_snap)["collected_at"]
     return {
         "status": "ok",
         "tgstat_configured": bool(TGSTAT_TOKEN and TGSTAT_TOKEN != "your_tgstat_token_here"),
         "openai_configured": bool(OPENAI_API_KEY and OPENAI_API_KEY != "sk-your_openai_key_here"),
         "channel_id": CHANNEL_ID,
-        "db_path": str(DB_PATH),
-        "db_exists": DB_PATH.exists(),
-        "last_collected": dict(last_snap)["collected_at"] if last_snap else None
+        "db": "postgresql" if (DATABASE_URL and psycopg2) else "sqlite",
+        "last_collected": last_ts
     }
 
 
