@@ -40,11 +40,14 @@ TGSTAT_BASE = "https://api.tgstat.ru"
 DB_PATH = Path(__file__).parent / "analytics.db"
 
 RENDER_URL = os.getenv("RENDER_EXTERNAL_URL", "")
+TGSTAT_CACHE_TTL = 6 * 3600  # 6 hours
 
 app = FastAPI(title="MOST Analytics")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 VALID_TOKENS: set[str] = set()
+
+_tgstat_cache: dict = {"stat": None, "info": None, "ts": 0}
 
 LOGIN_HTML = """<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MOST Analytics — Вход</title><style>
@@ -238,6 +241,23 @@ async def tgstat_request(endpoint: str, params: dict = None) -> dict:
         return data.get("response", data)
 
 
+async def tgstat_cached() -> tuple[dict, str]:
+    """Return (channel_stat, channel_title) from cache or fresh API call.
+    Uses only 2 API requests, caches for TGSTAT_CACHE_TTL seconds."""
+    now = time.time()
+    if _tgstat_cache["ts"] and (now - _tgstat_cache["ts"]) < TGSTAT_CACHE_TTL:
+        return _tgstat_cache["stat"] or {}, _tgstat_cache["info"].get("title", "MOST") if _tgstat_cache["info"] else "MOST"
+    try:
+        stat = await tgstat_request("channels/stat")
+        info = await tgstat_request("channels/get")
+        _tgstat_cache.update({"stat": stat, "info": info, "ts": now})
+        return stat, info.get("title", "MOST")
+    except Exception:
+        if _tgstat_cache["stat"]:
+            return _tgstat_cache["stat"], (_tgstat_cache["info"] or {}).get("title", "MOST")
+        return {}, "MOST"
+
+
 # ── Data Collection ───────────────────────────────────────────────────
 
 @app.post("/api/collect", dependencies=[Depends(check_auth)])
@@ -371,14 +391,7 @@ async def collect_history(days: int = Query(0)):
     days=0 означает «все посты», иначе — за последние N дней.
     TGStat не обязателен — если API недоступен, посты всё равно загрузятся."""
 
-    channel_stat = {}
-    channel_title = "MOST"
-    try:
-        channel_stat = await tgstat_request("channels/stat")
-        info = await tgstat_request("channels/get")
-        channel_title = info.get("title", "MOST")
-    except Exception:
-        pass
+    channel_stat, channel_title = await tgstat_cached()
 
     all_posts = await _scrape_telegram_channel(CHANNEL_ID)
 
@@ -426,14 +439,7 @@ async def upload_posts(request: Request):
     if not posts_data:
         raise HTTPException(400, "Нет постов в запросе")
 
-    channel_stat = {}
-    channel_title = "MOST"
-    try:
-        channel_stat = await tgstat_request("channels/stat")
-        info = await tgstat_request("channels/get")
-        channel_title = info.get("title", "MOST")
-    except Exception:
-        pass
+    channel_stat, channel_title = await tgstat_cached()
     collected_at = datetime.utcnow().isoformat()
 
     snap_params = (
@@ -875,8 +881,10 @@ async def cron_daily(request: Request):
     results = {}
 
     try:
+        _tgstat_cache["ts"] = 0  # force refresh
         channel_info = await tgstat_request("channels/get")
         channel_stat = await tgstat_request("channels/stat")
+        _tgstat_cache.update({"stat": channel_stat, "info": channel_info, "ts": time.time()})
         now_ts = int(time.time())
         two_days_ago = now_ts - 2 * 86400
         posts_data = await tgstat_request("channels/posts", {
