@@ -464,12 +464,12 @@ async def upload_posts(request: Request):
 
 @app.get("/api/snapshots", dependencies=[Depends(check_auth)])
 def get_snapshots(limit: int = 100):
-    """Все снэпшоты (история сборов)."""
+    """Снэпшоты с реальными данными (participants > 0)."""
     with get_db() as conn:
         rows = conn.execute(
             "SELECT id, collected_at, participants, avg_reach, err_percent, "
             "daily_reach, ci_index, posts_count, channel_title "
-            "FROM snapshots ORDER BY collected_at DESC LIMIT ?", (limit,)
+            "FROM snapshots WHERE participants > 0 ORDER BY collected_at DESC LIMIT ?", (limit,)
         ).fetchall()
     return [dict(r) for r in rows]
 
@@ -497,11 +497,11 @@ def get_posts(
 
 @app.get("/api/metrics", dependencies=[Depends(check_auth)])
 def get_metrics_history():
-    """Временной ряд ключевых метрик (для графиков)."""
+    """Временной ряд ключевых метрик (для графиков). Пропускаем снэпшоты с нулевыми данными."""
     with get_db() as conn:
         rows = conn.execute(
             "SELECT collected_at, participants, avg_reach, err_percent, daily_reach, posts_count "
-            "FROM snapshots ORDER BY collected_at ASC"
+            "FROM snapshots WHERE participants > 0 ORDER BY collected_at ASC"
         ).fetchall()
     return [dict(r) for r in rows]
 
