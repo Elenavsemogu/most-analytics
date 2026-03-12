@@ -45,6 +45,7 @@
         .kpi .delta { font-size: 12px; margin-top: 2px; }
         .kpi .delta.up { color: var(--green); }
         .kpi .delta.down { color: var(--red); }
+        .kpi-hint { font-size: 11px; color: var(--text2); margin-top: 6px; line-height: 1.4; opacity: 0.7; }
 
         /* Charts */
         .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
@@ -141,27 +142,25 @@
 
     <!-- KPI Cards -->
     <div class="kpi-grid">
-        <div class="kpi"><div class="label">Подписчики</div><div class="value" id="kSubs">—</div><div class="delta" id="kSubsD"></div></div>
-        <div class="kpi"><div class="label">Ср. охват</div><div class="value" id="kReach">—</div><div class="delta" id="kReachD"></div></div>
-        <div class="kpi"><div class="label">ERR</div><div class="value" id="kERR">—</div><div class="delta" id="kERRD"></div></div>
-        <div class="kpi"><div class="label">ER</div><div class="value" id="kER">—</div><div class="delta" id="kERD"></div></div>
-        <div class="kpi"><div class="label">Дневной охват</div><div class="value" id="kDaily">—</div><div class="delta" id="kDailyD"></div></div>
-        <div class="kpi"><div class="label">CI индекс</div><div class="value" id="kCI">—</div><div class="delta" id="kCID"></div></div>
-        <div class="kpi"><div class="label">Упоминаний</div><div class="value" id="kMentions">—</div><div class="delta" id="kMentionsD"></div></div>
+        <div class="kpi"><div class="label">Подписчики</div><div class="value" id="kSubs">—</div><div class="delta" id="kSubsD"></div><div class="kpi-hint">Аудитория канала. Рост = контент привлекает, падение = уходят</div></div>
+        <div class="kpi"><div class="label">Ср. охват поста</div><div class="value" id="kReach">—</div><div class="delta" id="kReachD"></div><div class="kpi-hint">Сколько людей в среднем видят один пост. Главный показатель качества</div></div>
+        <div class="kpi"><div class="label">ERR</div><div class="value" id="kERR">—</div><div class="delta" id="kERRD"></div><div class="kpi-hint">Охват/подписчики. Норма 15-30%. Ниже = Telegram режет показы</div></div>
+        <div class="kpi"><div class="label">Дневной охват</div><div class="value" id="kDaily">—</div><div class="delta" id="kDailyD"></div><div class="kpi-hint">Уникальных просмотров за день. Показывает ежедневную активность</div></div>
+        <div class="kpi"><div class="label">CI индекс</div><div class="value" id="kCI">—</div><div class="delta" id="kCID"></div><div class="kpi-hint">Цитируемость. Как часто канал упоминают и пересылают</div></div>
     </div>
 
-    <!-- Main charts — from post data (historical) -->
+    <!-- Main charts — from TGStat Premium historical data -->
     <div class="charts-grid">
-        <div class="chart-box"><h3>📈 Просмотры по неделям</h3><div class="chart-wrap"><canvas id="cWeeklyViews"></canvas></div></div>
-        <div class="chart-box"><h3>📊 Средний охват по неделям</h3><div class="chart-wrap"><canvas id="cWeeklyReach"></canvas></div></div>
+        <div class="chart-box"><h3>👥 Подписчики (динамика)</h3><div class="chart-wrap"><canvas id="cSubsHistory"></canvas></div></div>
+        <div class="chart-box"><h3>👁 Просмотры по дням</h3><div class="chart-wrap"><canvas id="cViewsHistory"></canvas></div></div>
+        <div class="chart-box"><h3>📊 Средний охват поста</h3><div class="chart-wrap"><canvas id="cReachHistory"></canvas></div></div>
+        <div class="chart-box"><h3>📈 ERR % (вовлечённость)</h3><div class="chart-wrap"><canvas id="cErrHistory"></canvas></div></div>
+    </div>
+
+    <!-- Post-based charts (from scraper/history) -->
+    <div class="charts-grid" id="postCharts" style="display:none;">
         <div class="chart-box"><h3>📝 Постов в неделю</h3><div class="chart-wrap"><canvas id="cWeeklyPosts"></canvas></div></div>
         <div class="chart-box"><h3>📅 Просмотры по месяцам</h3><div class="chart-wrap"><canvas id="cMonthlyViews"></canvas></div></div>
-    </div>
-
-    <!-- Snapshot-based charts (accumulate from cron) -->
-    <div class="charts-grid" id="snapshotCharts" style="display:none;">
-        <div class="chart-box"><h3>Подписчики (ежедн.)</h3><div class="chart-wrap"><canvas id="cSubs"></canvas></div></div>
-        <div class="chart-box"><h3>ERR % (ежедн.)</h3><div class="chart-wrap"><canvas id="cERR"></canvas></div></div>
     </div>
 
     <!-- Smart charts -->
@@ -174,8 +173,8 @@
     <!-- Tabs -->
     <div class="tabs">
         <div class="tab active" data-tab="posts">Посты</div>
-        <div class="tab" data-tab="analysis">GPT-анализ</div>
-        <div class="tab" data-tab="history">История анализов</div>
+        <div class="tab" data-tab="analysis">Спросить GPT</div>
+        <div class="tab" data-tab="history">История</div>
         <div class="tab" data-tab="strategy" onclick="loadStrategyTab()">📋 Стратегия</div>
     </div>
 
@@ -203,7 +202,8 @@
     <!-- Analysis tab -->
     <div class="tab-content" id="tab-analysis">
         <div class="section">
-            <h2>GPT-аналитика</h2>
+            <h2>Уточнить у GPT</h2>
+            <p style="color:var(--text2);font-size:13px;margin-bottom:14px;">Задай вопрос по каналу — GPT ответит на основе данных и стратегии</p>
             <div class="analysis-controls">
                 <select id="analysisDays">
                     <option value="7">7 дней</option>
@@ -216,12 +216,11 @@
                     <option value="standard" selected>Стандартный</option>
                     <option value="deep">Глубокий</option>
                 </select>
-                <button class="btn primary" onclick="runAnalysis()" id="analyzeBtn">Запустить анализ</button>
+                <button class="btn primary" onclick="runAnalysis()" id="analyzeBtn">Спросить</button>
             </div>
             <div class="analysis-content" id="analysisContent">
                 <div class="empty-state">
-                    <p>Выберите период и глубину, нажмите «Запустить анализ».</p>
-                    <p style="font-size:12px;">GPT-4o проанализирует данные с привязкой к маркетинговой стратегии.</p>
+                    <p>GPT проанализирует данные канала за выбранный период</p>
                 </div>
             </div>
         </div>
@@ -245,31 +244,11 @@
             </div>
 
             <div id="strat-overview" class="strat-section">
-                <div class="kpi-grid" style="margin-bottom:20px;">
-                    <div class="kpi"><div class="label">Падение охвата</div><div class="value" style="color:var(--red);">−76%</div><div class="delta" style="color:var(--text2);">за 4 мес (нояб → фев)</div></div>
-                    <div class="kpi"><div class="label">Подписчики</div><div class="value" style="color:var(--orange);">1 100</div><div class="delta" style="color:var(--text2);">цель: 1 400 за 3 мес</div></div>
-                    <div class="kpi"><div class="label">Контент-дисбаланс</div><div class="value" style="color:var(--blue);">75%</div><div class="delta" style="color:var(--text2);">историй vs 6% карьеры</div></div>
-                    <div class="kpi"><div class="label">Регулярно</div><div class="value" style="color:var(--green);">3/нед</div><div class="delta" style="color:var(--text2);">вт · чт · пт в 13:00 МСК</div></div>
-                    <div class="kpi"><div class="label">Целевой микс</div><div class="value" style="color:var(--accent2);">65/35</div><div class="delta" style="color:var(--text2);">HR+карьера / истории</div></div>
-                </div>
-                <div class="analysis-content">
-                    <h2>Ключевой диагноз</h2>
-                    <p>Канал <strong>@mostcareer</strong> с названием «MOST career» на <strong>75% состоит из историй про индустрию гемблинга</strong> (скандалы, мафия, казино), а не про карьеру. Целевая аудитория — соискатели и пассивные специалисты — не получают то, зачем подписались.</p>
-                    <h2>Главные проблемы</h2>
-                    <ul>
-                        <li><strong>Контент не соответствует ожиданиям ЦА.</strong> Подписчик пришёл за карьерой — получает историю про мафию на Мальте</li>
-                        <li><strong>5 постов/неделю при 1100 подписчиках — перегрузка.</strong> Подписчик видит 5 непрочитанных → не открывает ни один → Telegram понижает приоритет</li>
-                        <li><strong>Нет разнообразия форматов.</strong> Почти все посты — длинные тексты. Нет опросов, визуалов, коротких форматов</li>
-                        <li><strong>Серийный контент (3-4 части)</strong> растягивает аудиторию: кто пропустил часть 1 — не откроет остальные</li>
-                    </ul>
-                    <h2>Стратегия в 4 шага</h2>
-                    <ol>
-                        <li><strong>3 поста/нед:</strong> вт + чт HR-контент (с HR-отделом), пт — история. Вакансии — по мере появления</li>
-                        <li><strong>Публикация в 13:00 МСК</strong> — охват выше на 20% чем в 15:00</li>
-                        <li><strong>Добавить CTA</strong> в каждый пост: «Переслать коллеге» / «Откликнуться»</li>
-                        <li><strong>Рост подписчиков:</strong> cross-posting, виральный контент, SEO в Telegram, бот как воронка</li>
-                    </ol>
-                    <p style="margin-top:16px;color:var(--text2);">Подробнее — на вкладках «Стратегия» и «Аудит канала».</p>
+                <div class="analysis-content" id="insightsContent">
+                    <h2>Простые выводы и рекомендации</h2>
+                    <div id="insightsList" style="margin-top:12px;">
+                        <div class="empty-state"><span class="loader"></span><br>Загрузка данных...</div>
+                    </div>
                 </div>
             </div>
 
@@ -301,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     checkHealth();
     loadSnapshots();
-    loadMetrics();
+    loadTGStatHistory();
     loadPostTimeline();
     loadPosts();
     loadSmartCharts();
@@ -417,7 +396,7 @@ async function collectAll() {
     if (!parts.length) parts.push('нет данных');
     btn.innerHTML = parts.join(' + ');
     setTimeout(() => { btn.innerHTML = 'Обновить данные'; btn.disabled = false; }, 3500);
-    checkHealth(); loadSnapshots(); loadMetrics(); loadPostTimeline(); loadPosts(); loadSmartCharts();
+    checkHealth(); loadSnapshots(); loadTGStatHistory(); loadPostTimeline(); loadPosts(); loadSmartCharts();
 }
 
 async function loadSnapshots() {
@@ -445,28 +424,108 @@ function setKPI(id, val, prev, sfx = '') {
     }
 }
 
-async function loadMetrics() {
+async function loadTGStatHistory() {
     try {
-        const data = await api('/api/metrics');
-        if (data.length < 2) { document.getElementById('snapshotCharts').style.display = 'none'; return; }
-        document.getElementById('snapshotCharts').style.display = 'grid';
-        const labels = data.map(d => new Date(d.collected_at).toLocaleDateString('ru-RU', {day:'numeric',month:'short'}));
-        mkChart('cSubs', labels, data.map(d => d.participants), '#6c5ce7');
-        mkChart('cERR', labels, data.map(d => d.err_percent), '#00b894');
-    } catch(e) { console.error(e); }
+        const data = await api('/api/tgstat-history');
+
+        function parseTimeSeries(raw) {
+            if (!raw || raw.error || !Array.isArray(raw)) return { labels: [], values: [] };
+            const labels = [], values = [];
+            for (const item of raw) {
+                const d = item.date || item.period;
+                const v = item.subscribers_count ?? item.views_count ?? item.avg_post_reach ?? item.err ?? item.value ?? item.count ?? 0;
+                if (d) {
+                    const dt = new Date(typeof d === 'number' ? d * 1000 : d);
+                    labels.push(dt.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }));
+                    values.push(typeof v === 'number' ? v : parseFloat(v) || 0);
+                }
+            }
+            return { labels, values };
+        }
+
+        const subs = parseTimeSeries(data.subscribers);
+        const views = parseTimeSeries(data.views);
+        const reach = parseTimeSeries(data.avg_reach);
+        const err = parseTimeSeries(data.err);
+
+        if (subs.values.length > 1) mkChart('cSubsHistory', subs.labels, subs.values, '#6c5ce7');
+        if (views.values.length > 1) mkChart('cViewsHistory', views.labels, views.values, '#74b9ff', 'bar');
+        if (reach.values.length > 1) mkChart('cReachHistory', reach.labels, reach.values, '#a29bfe');
+        if (err.values.length > 1) mkChart('cErrHistory', err.labels, err.values, '#00b894');
+
+        buildInsights(data, subs, views, reach, err);
+    } catch (e) {
+        console.error('tgstat-history:', e);
+        // fallback to old metrics endpoint
+        try {
+            const data = await api('/api/metrics');
+            if (data.length >= 2) {
+                const labels = data.map(d => new Date(d.collected_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }));
+                mkChart('cSubsHistory', labels, data.map(d => d.participants), '#6c5ce7');
+                mkChart('cErrHistory', labels, data.map(d => d.err_percent), '#00b894');
+                mkChart('cReachHistory', labels, data.map(d => d.avg_reach), '#a29bfe');
+                mkChart('cViewsHistory', labels, data.map(d => d.daily_reach), '#74b9ff', 'bar');
+            }
+        } catch (e2) { console.error(e2); }
+    }
+}
+
+function buildInsights(raw, subs, views, reach, err) {
+    const el = document.getElementById('insightsList');
+    const items = [];
+
+    if (subs.values.length > 7) {
+        const recent = subs.values.slice(-7);
+        const prev = subs.values.slice(-14, -7);
+        const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
+        const prevAvg = prev.length ? prev.reduce((a, b) => a + b, 0) / prev.length : recentAvg;
+        const diff = recentAvg - prevAvg;
+        const trend = diff > 2 ? '📈 Растут' : diff < -2 ? '📉 Падают' : '➡️ Стабильно';
+        items.push({ icon: trend, text: `Подписчики за неделю: ${Math.round(diff) > 0 ? '+' : ''}${Math.round(diff)}. Сейчас ~${Math.round(recentAvg)}` });
+    }
+
+    if (reach.values.length > 3) {
+        const avg = reach.values.slice(-7).reduce((a, b) => a + b, 0) / Math.min(reach.values.length, 7);
+        items.push({ icon: '👁', text: `Средний охват поста за неделю: ${Math.round(avg)} чел. Это ${Math.round(avg / (subs.values[subs.values.length - 1] || 1) * 100)}% подписчиков` });
+    }
+
+    if (err.values.length > 3) {
+        const avgErr = err.values.slice(-7).reduce((a, b) => a + b, 0) / Math.min(err.values.length, 7);
+        const verdict = avgErr > 25 ? 'Хорошо!' : avgErr > 15 ? 'Нормально' : 'Низко — Telegram может резать показы';
+        items.push({ icon: '📊', text: `ERR за неделю: ${avgErr.toFixed(1)}%. ${verdict}` });
+    }
+
+    if (views.values.length > 7) {
+        const totalWeek = views.values.slice(-7).reduce((a, b) => a + b, 0);
+        items.push({ icon: '📱', text: `Просмотров за неделю: ${totalWeek.toLocaleString('ru-RU')}` });
+    }
+
+    items.push({ icon: '⏰', text: 'Среднее время постинга ~15:00 МСК. Основная активность аудитории в 12:00-13:00. Попробуйте постить в 13:00 МСК' });
+    items.push({ icon: '📅', text: 'Рекомендация: 3 поста/неделю (вт, чт, пт). Больше = перегрузка, Telegram снижает приоритет' });
+    items.push({ icon: '🎯', text: 'Целевой микс: 65% карьера/HR + 35% истории. Вакансии — по мере появления' });
+
+    if (items.length) {
+        el.innerHTML = items.map(i =>
+            `<div style="display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--border);">
+                <span style="font-size:18px;flex-shrink:0;width:28px;text-align:center;">${i.icon}</span>
+                <span style="font-size:14px;line-height:1.5;">${i.text}</span>
+            </div>`
+        ).join('');
+    } else {
+        el.innerHTML = '<p style="color:var(--text2)">Нет данных для выводов. Нажмите «Обновить данные».</p>';
+    }
 }
 
 async function loadPostTimeline() {
     try {
         const data = await api('/api/posts-timeline');
         if (!data.weekly || !data.weekly.length) return;
+        document.getElementById('postCharts').style.display = 'grid';
         const w = data.weekly;
         const wLabels = w.map(d => {
             const parts = d.week.split('-W');
             return 'W' + parts[1];
         });
-        mkChart('cWeeklyViews', wLabels, w.map(d => d.total_views), '#6c5ce7', 'bar');
-        mkChart('cWeeklyReach', wLabels, w.map(d => d.avg_views), '#74b9ff');
         mkChart('cWeeklyPosts', wLabels, w.map(d => d.posts_count), '#00b894', 'bar');
 
         if (data.monthly && data.monthly.length) {

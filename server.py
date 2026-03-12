@@ -460,6 +460,41 @@ async def upload_posts(request: Request):
     return {"status": "ok", "posts_uploaded": len(posts_data), "snapshot_id": snapshot_id}
 
 
+# ── TGStat Premium Historical Data ────────────────────────────────────
+
+@app.get("/api/tgstat-history", dependencies=[Depends(check_auth)])
+async def get_tgstat_history():
+    """Fetch historical data from TGStat Premium: subscribers, views, avg reach, ERR."""
+    if not TGSTAT_TOKEN:
+        raise HTTPException(400, "TGSTAT_TOKEN не настроен")
+
+    end_date = datetime.utcnow().strftime("%Y-%m-%d")
+    start_date = (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d")
+    params_base = {"startDate": start_date, "endDate": end_date, "group": "day"}
+
+    results = {}
+    endpoints = {
+        "subscribers": "channels/subscribers",
+        "views": "channels/views",
+        "avg_reach": "channels/avg-posts-reach",
+        "err": "channels/err",
+    }
+
+    for key, endpoint in endpoints.items():
+        try:
+            data = await tgstat_request(endpoint, params_base.copy())
+            if isinstance(data, list):
+                results[key] = data
+            elif isinstance(data, dict) and "items" in data:
+                results[key] = data["items"]
+            else:
+                results[key] = data if isinstance(data, list) else []
+        except Exception as e:
+            results[key] = {"error": str(e)}
+
+    return results
+
+
 # ── Data Retrieval ────────────────────────────────────────────────────
 
 @app.get("/api/snapshots", dependencies=[Depends(check_auth)])
