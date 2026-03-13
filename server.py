@@ -834,7 +834,7 @@ def get_posts_timeline():
     from collections import defaultdict
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT date, views, text FROM posts WHERE date != '' ORDER BY date ASC"
+            "SELECT date, views, text FROM posts WHERE date IS NOT NULL ORDER BY date ASC"
         ).fetchall()
 
     weeks = defaultdict(lambda: {"views": 0, "count": 0, "types": defaultdict(int)})
@@ -842,13 +842,18 @@ def get_posts_timeline():
 
     for r in rows:
         try:
-            dt = datetime.fromisoformat(r["date"].replace("+00:00", "").replace("Z", ""))
+            raw_date = r["date"]
+            if isinstance(raw_date, datetime):
+                dt = raw_date
+            else:
+                dt = datetime.fromisoformat(str(raw_date).replace("+00:00", "").replace("Z", ""))
             wk = dt.strftime("%Y-W%W")
             mo = dt.strftime("%Y-%m")
-            weeks[wk]["views"] += r["views"]
+            views = r["views"] or 0
+            weeks[wk]["views"] += views
             weeks[wk]["count"] += 1
-            weeks[wk]["types"][classify_post(r["text"])] += 1
-            months[mo]["views"] += r["views"]
+            weeks[wk]["types"][classify_post(r["text"] or "")] += 1
+            months[mo]["views"] += views
             months[mo]["count"] += 1
         except Exception:
             pass
@@ -880,7 +885,7 @@ def get_posts_timeline():
 @app.get("/api/content-mix", dependencies=[Depends(check_auth)])
 def get_content_mix(days: int = 30):
     """Content mix breakdown for charts."""
-    cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+    cutoff = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
     with get_db() as conn:
         rows = conn.execute(
             "SELECT text, views FROM posts WHERE date >= ?", (cutoff,)
