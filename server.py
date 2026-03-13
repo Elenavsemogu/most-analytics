@@ -194,8 +194,6 @@ def classify_post(text: str) -> str:
     if any(k in t for k in ['статья', 'вышла наша', 'читайте', 'подборк', 'дайджест',
                              'анонс', 'партнёр', 'конференц', 'событи']):
         return 'announce'
-    if any(k in t for k in ['опрос', 'голосуй', 'quiz', 'квиз']):
-        return 'interactive'
     return 'story'
 
 
@@ -660,7 +658,7 @@ async def run_analysis(days: int = Query(7), depth: str = Query("standard")):
 
 ПРАВИЛА АНАЛИЗА:
 1. КАЖДЫЙ пост оценивай конкретно: сработал / средне / провалился. Укажи ПОЧЕМУ (тема, формат, время, длина, тип).
-2. Сравнивай охваты по типам контента: vacancy, career, story, announce, interactive.
+2. Сравнивай охваты по типам контента: vacancy, career, story, announce.
 3. Привязывай всё к стратегии: регулярный контент ~65% карьера/HR + ~35% истории. Вакансии и анонсы — ситуативные, не планируются. Соблюдается ли баланс? Скажи прямо.
 4. Подписчики: рост или отток? Что могло повлиять?
 5. НЕ ДАВАЙ поверхностных советов типа «делитесь кейсами», «больше вовлекайте аудиторию», «используйте storytelling». Только конкретные, actionable рекомендации.
@@ -902,6 +900,82 @@ def get_content_mix(days: int = 30):
             "total_views": d["total_views"]
         })
     return sorted(result, key=lambda x: -x["count"])
+
+
+# ── Posting Analysis (hours, days, types) ────────────────────────────
+
+@app.get("/api/posting-analysis", dependencies=[Depends(check_auth)])
+def get_posting_analysis(days: int = 180):
+    """Real posting time analysis: hours (MSK), days, type performance."""
+    from collections import defaultdict, Counter
+    cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT date, views, text FROM posts WHERE date >= ? AND date != '' ORDER BY date ASC",
+            (cutoff,)
+        ).fetchall()
+
+    seen_links = set()
+    posts = []
+    for r in rows:
+        d = dict(r)
+        date_key = d["date"][:16]
+        if date_key in seen_links:
+            continue
+        seen_links.add(date_key)
+        posts.append(d)
+
+    hours = Counter()
+    day_views = defaultdict(list)
+    type_views = defaultdict(list)
+    day_names = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+
+    for p in posts:
+        try:
+            dt = datetime.fromisoformat(p["date"].replace("+00:00", "").replace("Z", ""))
+            msk_hour = (dt.hour + 3) % 24
+            hours[msk_hour] += 1
+            wd = dt.weekday()
+            day_views[wd].append(p.get("views", 0))
+        except Exception:
+            pass
+        ptype = classify_post(p.get("text", ""))
+        type_views[ptype].append(p.get("views", 0))
+
+    hours_data = [{"hour": h, "count": hours.get(h, 0)} for h in range(24)]
+
+    days_data = []
+    for wd in range(7):
+        vs = day_views.get(wd, [])
+        days_data.append({
+            "day": day_names[wd],
+            "day_idx": wd,
+            "posts": len(vs),
+            "avg_views": round(sum(vs) / len(vs)) if vs else 0,
+        })
+
+    types_data = []
+    for t, vs in type_views.items():
+        types_data.append({
+            "type": t,
+            "count": len(vs),
+            "avg_views": round(sum(vs) / len(vs)) if vs else 0,
+            "total_views": sum(vs),
+        })
+    types_data.sort(key=lambda x: -x["avg_views"])
+
+    peak_hour = max(hours, key=hours.get) if hours else 15
+    best_day = max(days_data, key=lambda x: x["avg_views"]) if days_data else None
+
+    return {
+        "total_posts": len(posts),
+        "hours": hours_data,
+        "days": days_data,
+        "types": types_data,
+        "peak_posting_hour": peak_hour,
+        "best_day": best_day["day"] if best_day else "Чт",
+        "best_day_avg": best_day["avg_views"] if best_day else 0,
+    }
 
 
 # ── Cron (daily auto-collect) ────────────────────────────────────────
