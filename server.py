@@ -1000,6 +1000,13 @@ def _parse_post_date(raw_date):
 @app.get("/api/dashboard-summary", dependencies=[Depends(check_auth)])
 def get_dashboard_summary():
     """All data for the main dashboard in one call."""
+    import traceback
+    try:
+        return _dashboard_summary_impl()
+    except Exception as e:
+        raise HTTPException(500, f"{e.__class__.__name__}: {e}\n{traceback.format_exc()}")
+
+def _dashboard_summary_impl():
     from collections import defaultdict
 
     now = datetime.utcnow()
