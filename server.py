@@ -919,6 +919,8 @@ def get_posting_analysis(days: int = 180):
     posts = []
     for r in rows:
         d = dict(r)
+        if not d.get("date"):
+            continue
         date_key = d["date"][:16]
         if date_key in seen_links:
             continue
