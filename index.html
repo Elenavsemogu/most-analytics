@@ -17,7 +17,6 @@
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
         .container { max-width: 1320px; margin: 0 auto; padding: 20px; }
 
-        /* Header */
         header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
         header h1 { font-size: 26px; font-weight: 700; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .subtitle { color: var(--text2); font-size: 13px; }
@@ -28,32 +27,72 @@
         .btn.primary:hover { background: #5a4bd4; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         select { padding: 8px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; }
-        input[type=number] { padding: 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; width: 65px; }
 
-        /* Freshness banner */
         .freshness { display: flex; gap: 8px; align-items: center; padding: 10px 16px; background: var(--surface); border-radius: 8px; margin-bottom: 20px; font-size: 13px; color: var(--text2); }
         .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
         .dot.fresh { background: var(--green); }
         .dot.stale { background: var(--orange); }
         .dot.dead { background: var(--red); }
 
-        /* KPI grid */
-        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 24px; }
+        /* Main + sidebar layout */
+        .main-layout { display: grid; grid-template-columns: 1fr 220px; gap: 20px; }
+        @media (max-width: 1000px) { .main-layout { grid-template-columns: 1fr; } }
+        .main-col { min-width: 0; }
+
+        /* KPI */
+        .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+        @media (max-width: 700px) { .kpi-row { grid-template-columns: 1fr; } }
         .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
-        .kpi .label { font-size: 12px; color: var(--text2); margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .kpi .value { font-size: 24px; font-weight: 700; }
+        .kpi .label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .kpi .value { font-size: 28px; font-weight: 700; }
         .kpi .delta { font-size: 12px; margin-top: 2px; }
         .kpi .delta.up { color: var(--green); }
         .kpi .delta.down { color: var(--red); }
-        .kpi-hint { font-size: 11px; color: var(--text2); margin-top: 6px; line-height: 1.4; opacity: 0.7; }
+        .kpi .delta.neutral { color: var(--text2); }
 
-        /* Charts */
-        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
-        @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
-        .chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+        /* Chart */
+        .chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 20px; }
         .chart-box h3 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text2); }
-        .chart-wrap { position: relative; height: 240px; }
+        .chart-wrap { position: relative; height: 260px; }
 
+        /* Scorecard */
+        .section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; }
+        .section h2 { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 13px; }
+        th { font-size: 11px; text-transform: uppercase; color: var(--text2); font-weight: 600; }
+        tr:hover td { background: var(--surface2); }
+        .text-preview { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        a { color: var(--accent2); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+        .badge.vacancy { background: #6c5ce720; color: var(--accent2); }
+        .badge.career { background: #00b89420; color: var(--green); }
+        .badge.story { background: #74b9ff20; color: var(--blue); }
+        .badge.announce { background: #fdcb6e20; color: var(--orange); }
+        .cell-up { color: var(--green); font-weight: 600; }
+        .cell-down { color: var(--red); font-weight: 600; }
+        .cell-neutral { color: var(--text2); }
+
+        .post-row { border-left: 3px solid transparent; }
+        .post-row.good { border-left-color: var(--green); }
+        .post-row.bad { border-left-color: var(--red); }
+
+        /* Insights */
+        .insight-item { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); }
+        .insight-item:last-child { border-bottom: none; }
+        .insight-arrow { font-size: 18px; flex-shrink: 0; width: 24px; text-align: center; }
+        .insight-text { font-size: 14px; line-height: 1.5; }
+
+        /* Sidebar */
+        .side-col { display: flex; flex-direction: column; gap: 10px; }
+        .side-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+        .side-card .label { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+        .side-card .value { font-size: 20px; font-weight: 700; margin-top: 2px; }
+        .side-card .delta { font-size: 11px; margin-top: 2px; }
+        .side-card .delta.up { color: var(--green); }
+        .side-card .delta.down { color: var(--red); }
+        .side-badge { text-align: center; font-size: 10px; color: var(--text2); opacity: 0.5; padding: 8px 0; }
 
         /* Tabs */
         .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
@@ -63,27 +102,6 @@
         .tab-content { display: none; }
         .tab-content.active { display: block; }
 
-        /* Section */
-        .section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; }
-        .section h2 { font-size: 17px; font-weight: 600; margin-bottom: 14px; }
-
-        /* Table */
-        table { width: 100%; border-collapse: collapse; }
-        th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 13px; }
-        th { font-size: 11px; text-transform: uppercase; color: var(--text2); font-weight: 600; }
-        tr:hover td { background: var(--surface2); }
-        .text-preview { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        a { color: var(--accent2); text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-        .badge.vacancy { background: #6c5ce720; color: var(--accent2); }
-        .badge.career { background: #00b89420; color: var(--green); }
-        .badge.story { background: #74b9ff20; color: var(--blue); }
-        .badge.announce { background: #fdcb6e20; color: var(--orange); }
-        .delta-cell.up { color: var(--green); }
-        .delta-cell.down { color: var(--red); }
-
-        /* Analysis */
         .analysis-controls { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
         .analysis-content { background: var(--surface2); border-radius: 8px; padding: 20px; min-height: 100px; line-height: 1.8; }
         .analysis-content h1, .analysis-content h2, .analysis-content h3 { margin-top: 16px; margin-bottom: 8px; color: var(--accent2); }
@@ -91,18 +109,14 @@
         .analysis-content li { margin-bottom: 4px; }
         .analysis-content p { margin-bottom: 10px; }
         .analysis-content strong { color: #fff; }
-        .analysis-content table { margin: 12px 0; }
         .analysis-content code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
-
         .history-item { padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
         .history-item:hover { border-color: var(--accent); }
         .history-item .meta { font-size: 12px; color: var(--text2); }
 
         .loader { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-
         .empty-state { text-align: center; padding: 40px; color: var(--text2); }
-        .empty-state p { margin-bottom: 12px; }
     </style>
 </head>
 <body>
@@ -113,175 +127,132 @@
             <div class="subtitle" id="channelName">@mostcareer</div>
         </div>
         <div class="actions">
-            <select id="historyDays" onchange="toggleCustomDays()">
-                <option value="7">7 дней</option>
-                <option value="14">14 дней</option>
-                <option value="30" selected>30 дней</option>
-                <option value="60">60 дней</option>
-                <option value="90">90 дней</option>
-                <option value="180">180 дней</option>
-                <option value="0">Все посты</option>
-                <option value="custom">Своё...</option>
-            </select>
-            <input id="customDays" type="number" min="1" max="999" placeholder="дн" style="display:none;">
-            <button class="btn primary" onclick="collectAll()" id="collectBtn">Обновить данные</button>
-            <a class="btn" id="csvLink" href="/api/export/csv?days=30" target="_blank">CSV</a>
-            <a class="btn" id="reportLink" href="/api/export/report?days=30" target="_blank">Отчёт</a>
+            <button class="btn primary" onclick="collectAll()" id="collectBtn">Obновить данные</button>
+            <a class="btn" href="/api/export/csv?days=90" target="_blank">CSV</a>
+            <a class="btn" href="/api/export/report?days=30" target="_blank">Отчёт</a>
         </div>
     </header>
 
-    <!-- Freshness banner -->
     <div class="freshness" id="freshness">
         <span class="dot" id="freshDot"></span>
         <span id="freshText">Проверка...</span>
     </div>
 
-    <!-- KPI Cards -->
-    <div class="kpi-grid">
-        <div class="kpi"><div class="label">Подписчики</div><div class="value" id="kSubs">—</div><div class="delta" id="kSubsD"></div><div class="kpi-hint">Аудитория канала. Рост = контент привлекает, падение = уходят</div></div>
-        <div class="kpi"><div class="label">Ср. охват поста</div><div class="value" id="kReach">—</div><div class="delta" id="kReachD"></div><div class="kpi-hint">Сколько людей в среднем видят один пост. Главный показатель качества</div></div>
-        <div class="kpi"><div class="label">ERR</div><div class="value" id="kERR">—</div><div class="delta" id="kERRD"></div><div class="kpi-hint">Охват/подписчики. Норма 15-30%. Ниже = Telegram режет показы</div></div>
-        <div class="kpi"><div class="label">Дневной охват</div><div class="value" id="kDaily">—</div><div class="delta" id="kDailyD"></div><div class="kpi-hint">Уникальных просмотров за день. Показывает ежедневную активность</div></div>
-        <div class="kpi"><div class="label">CI индекс</div><div class="value" id="kCI">—</div><div class="delta" id="kCID"></div><div class="kpi-hint">Цитируемость. Как часто канал упоминают и пересылают</div></div>
-    </div>
-
-    <!-- Charts -->
-    <div class="charts-grid">
-        <div class="chart-box"><h3>⏰ Время постинга (МСК)</h3><div class="chart-wrap"><canvas id="cHours"></canvas></div></div>
-        <div class="chart-box"><h3>📅 Лучший день публикации</h3><div class="chart-wrap"><canvas id="cDays"></canvas></div></div>
-    </div>
-    <div class="charts-grid">
-        <div class="chart-box"><h3>📊 Охват по типу контента</h3><div class="chart-wrap"><canvas id="cMix"></canvas></div></div>
-        <div class="chart-box"><h3>📝 Постов в неделю</h3><div class="chart-wrap"><canvas id="cWeeklyPosts"></canvas></div></div>
-    </div>
-    <div class="charts-grid">
-        <div class="chart-box"><h3>📅 Просмотры по месяцам</h3><div class="chart-wrap"><canvas id="cMonthlyViews"></canvas></div></div>
-    </div>
-
-    <!-- Insights block -->
-    <div class="section" style="margin-bottom:24px;">
-        <h2>Выводы из данных</h2>
-        <div id="insightsList" style="margin-top:8px;"><div class="empty-state"><span class="loader"></span> Загрузка...</div></div>
-    </div>
-
-    <!-- Tabs -->
-    <div class="tabs">
-        <div class="tab active" data-tab="posts">Посты</div>
-        <div class="tab" data-tab="analysis">Спросить GPT</div>
-        <div class="tab" data-tab="history">История</div>
-        <div class="tab" data-tab="strategy" onclick="loadStrategyTab()">📋 Стратегия</div>
-    </div>
-
-    <!-- Posts tab -->
-    <div class="tab-content active" id="tab-posts">
-        <div class="section">
-            <h2>Посты канала</h2>
-            <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
-                <select id="postsDays" onchange="loadPosts()">
-                    <option value="7">7 дней</option>
-                    <option value="14">14 дней</option>
-                    <option value="30" selected>30 дней</option>
-                    <option value="90">90 дней</option>
-                    <option value="180">180 дней</option>
-                </select>
-                <select id="postsSort" onchange="loadPosts()">
-                    <option value="views" selected>По просмотрам</option>
-                    <option value="date">По дате</option>
-                </select>
-            </div>
-            <div id="postsTable"><div class="empty-state"><p>Нажмите «Обновить данные» для загрузки.</p></div></div>
-        </div>
-    </div>
-
-    <!-- Analysis tab -->
-    <div class="tab-content" id="tab-analysis">
-        <div class="section">
-            <h2>Уточнить у GPT</h2>
-            <p style="color:var(--text2);font-size:13px;margin-bottom:14px;">Задай вопрос по каналу — GPT ответит на основе данных и стратегии</p>
-            <div class="analysis-controls">
-                <select id="analysisDays">
-                    <option value="7">7 дней</option>
-                    <option value="14">14 дней</option>
-                    <option value="30" selected>30 дней</option>
-                    <option value="90">90 дней</option>
-                    <option value="120">120 дней</option>
-                </select>
-                <select id="analysisDepth">
-                    <option value="standard" selected>Стандартный</option>
-                    <option value="deep">Глубокий</option>
-                </select>
-                <button class="btn primary" onclick="runAnalysis()" id="analyzeBtn">Спросить</button>
-            </div>
-            <div class="analysis-content" id="analysisContent">
-                <div class="empty-state">
-                    <p>GPT проанализирует данные канала за выбранный период</p>
+    <div class="main-layout">
+        <!-- LEFT: main content -->
+        <div class="main-col">
+            <!-- KPI cards -->
+            <div class="kpi-row">
+                <div class="kpi">
+                    <div class="label">Avg views / post</div>
+                    <div class="value" id="kAvg">—</div>
+                    <div class="delta" id="kAvgD">за последние 2 недели</div>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- History tab -->
-    <div class="tab-content" id="tab-history">
-        <div class="section">
-            <h2>История анализов</h2>
-            <div id="analysisHistory"><div class="empty-state"><p>Анализы ещё не проводились.</p></div></div>
-        </div>
-    </div>
-
-    <!-- Strategy tab -->
-    <div class="tab-content" id="tab-strategy">
-        <div class="section">
-            <div class="strat-tabs" style="display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--border);">
-                <div class="strat-tab active" data-strat="overview" style="padding:8px 16px;cursor:pointer;font-size:14px;color:var(--accent2);border-bottom:2px solid var(--accent);">Обзор</div>
-                <div class="strat-tab" data-strat="full" style="padding:8px 16px;cursor:pointer;font-size:14px;color:var(--text2);border-bottom:2px solid transparent;">Стратегия</div>
-                <div class="strat-tab" data-strat="audit" style="padding:8px 16px;cursor:pointer;font-size:14px;color:var(--text2);border-bottom:2px solid transparent;">Аудит канала</div>
-            </div>
-
-            <div id="strat-overview" class="strat-section">
-                <div class="analysis-content">
-                    <h2>Ключевые принципы</h2>
-                    <ul>
-                        <li><strong>Целевой микс:</strong> 65% карьера/HR + 35% индустриальные истории. Вакансии и анонсы — ситуативно</li>
-                        <li><strong>Частота:</strong> определяется командой, данные по дням и часам — на графиках выше</li>
-                        <li><strong>Карьерные посты</strong> пока дают меньше охвата чем истории — нужна работа над форматами</li>
-                        <li><strong>Анонсы</strong> — лидеры по охвату, используйте при возможности</li>
-                    </ul>
-                    <p style="margin-top:12px;color:var(--text2);">Подробнее — на вкладках «Стратегия» и «Аудит канала».</p>
+                <div class="kpi">
+                    <div class="label">Лучший тип</div>
+                    <div class="value" id="kBestType">—</div>
+                    <div class="delta" id="kBestTypeD"></div>
+                </div>
+                <div class="kpi">
+                    <div class="label">Постов за 2 нед</div>
+                    <div class="value" id="kPosts">—</div>
+                    <div class="delta" id="kPostsD"></div>
                 </div>
             </div>
 
-            <div id="strat-full" class="strat-section" style="display:none;">
-                <div class="analysis-content" id="strategyMd"><div class="empty-state"><span class="loader"></span><br>Загрузка стратегии...</div></div>
+            <!-- Weekly trend chart -->
+            <div class="chart-box">
+                <h3>Avg views/post по неделям</h3>
+                <div class="chart-wrap"><canvas id="cWeekly"></canvas></div>
             </div>
 
-            <div id="strat-audit" class="strat-section" style="display:none;">
-                <div class="analysis-content" id="auditMd"><div class="empty-state"><span class="loader"></span><br>Загрузка аудита...</div></div>
+            <!-- Type scorecard -->
+            <div class="section" id="scorecardSection">
+                <h2>Эффективность типов контента</h2>
+                <div id="scorecardTable"><div class="empty-state"><span class="loader"></span></div></div>
             </div>
+
+            <!-- Recent posts -->
+            <div class="section" id="postsSection">
+                <h2>Последние посты</h2>
+                <div id="recentTable"><div class="empty-state"><span class="loader"></span></div></div>
+            </div>
+
+            <!-- Insights -->
+            <div class="section" id="insightsSection">
+                <h2>Выводы</h2>
+                <div id="insightsList"><div class="empty-state"><span class="loader"></span></div></div>
+            </div>
+
+            <!-- Tabs: GPT / History -->
+            <div class="tabs">
+                <div class="tab active" data-tab="analysis">Спросить GPT</div>
+                <div class="tab" data-tab="history">История</div>
+            </div>
+
+            <div class="tab-content active" id="tab-analysis">
+                <div class="section">
+                    <h2>Уточнить у GPT</h2>
+                    <p style="color:var(--text2);font-size:13px;margin-bottom:14px;">Задай вопрос по каналу — GPT ответит на основе данных</p>
+                    <div class="analysis-controls">
+                        <select id="analysisDays">
+                            <option value="7">7 дней</option>
+                            <option value="14">14 дней</option>
+                            <option value="30" selected>30 дней</option>
+                            <option value="90">90 дней</option>
+                        </select>
+                        <button class="btn primary" onclick="runAnalysis()" id="analyzeBtn">Спросить</button>
+                    </div>
+                    <div class="analysis-content" id="analysisContent">
+                        <div class="empty-state"><p>GPT проанализирует данные канала за выбранный период</p></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="tab-history">
+                <div class="section">
+                    <h2>История анализов</h2>
+                    <div id="analysisHistory"><div class="empty-state"><p>Анализы ещё не проводились.</p></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: TGStat sidebar -->
+        <div class="side-col">
+            <div class="side-card">
+                <div class="label">Подписчики</div>
+                <div class="value" id="sSubs">—</div>
+                <div class="delta" id="sSubsD"></div>
+            </div>
+            <div class="side-card">
+                <div class="label">Ср. охват</div>
+                <div class="value" id="sReach">—</div>
+                <div class="delta" id="sReachD"></div>
+            </div>
+            <div class="side-card">
+                <div class="label">ERR %</div>
+                <div class="value" id="sERR">—</div>
+                <div class="delta" id="sERRD"></div>
+            </div>
+            <div class="side-card">
+                <div class="label">CI индекс</div>
+                <div class="value" id="sCI">—</div>
+                <div class="delta" id="sCID"></div>
+            </div>
+            <div class="side-badge">TGStat Premium</div>
         </div>
     </div>
 </div>
 
 <script>
 const API = '';
-const charts = {};
-const chartOpts = {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-        x: { grid: { color: '#2e3348' }, ticks: { color: '#8b90a5', font: { size: 10 } } },
-        y: { grid: { color: '#2e3348' }, ticks: { color: '#8b90a5', font: { size: 10 } } }
-    },
-    elements: { line: { tension: 0.3, borderWidth: 2 }, point: { radius: 3, hoverRadius: 5 } }
-};
+let weeklyChart = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     checkHealth();
-    loadSnapshots();
-    loadPostingAnalysis();
-    loadPostTimeline();
-    loadPosts();
-    loadSmartCharts();
+    loadDashboard();
+    loadSidebar();
     loadAnalysisHistory();
 });
 
@@ -327,18 +298,163 @@ async function checkHealth() {
     }
 }
 
-function toggleCustomDays() {
-    const sel = document.getElementById('historyDays');
-    document.getElementById('customDays').style.display = sel.value === 'custom' ? 'inline-block' : 'none';
-    const d = sel.value === 'custom' ? 30 : parseInt(sel.value) || 30;
-    document.getElementById('csvLink').href = '/api/export/csv?days=' + (d || 90);
-    document.getElementById('reportLink').href = '/api/export/report?days=' + (d || 30);
+/* ─── Main dashboard ─── */
+
+async function loadDashboard() {
+    try {
+        const d = await api('/api/dashboard-summary');
+        renderKPI(d);
+        renderWeeklyChart(d.weekly_trend);
+        renderScorecard(d.type_scorecard);
+        renderRecentPosts(d.recent_posts);
+        renderInsights(d.insights);
+    } catch(e) {
+        console.error('dashboard-summary:', e);
+        document.getElementById('insightsList').innerHTML = '<div class="empty-state">Ошибка загрузки: ' + e.message + '</div>';
+    }
 }
-function getSelectedDays() {
-    const sel = document.getElementById('historyDays');
-    if (sel.value === 'custom') { const v = parseInt(document.getElementById('customDays').value); return isNaN(v) || v < 1 ? null : v; }
-    return parseInt(sel.value);
+
+function renderKPI(d) {
+    document.getElementById('kAvg').textContent = d.current_avg;
+    const dEl = document.getElementById('kAvgD');
+    const sign = d.delta_pct > 0 ? '+' : '';
+    dEl.textContent = `${sign}${d.delta_pct}% vs пред. месяц (было ${d.previous_avg})`;
+    dEl.className = 'delta ' + (d.delta_pct > 5 ? 'up' : d.delta_pct < -5 ? 'down' : 'neutral');
+
+    if (d.best_type) {
+        document.getElementById('kBestType').textContent = d.best_type.type_label;
+        const btD = document.getElementById('kBestTypeD');
+        btD.textContent = `+${d.best_type.vs_channel_avg_pct}% к среднему (${d.best_type.avg_views} avg)`;
+        btD.className = 'delta up';
+    }
+
+    document.getElementById('kPosts').textContent = d.current_posts_count;
+    const pD = document.getElementById('kPostsD');
+    pD.textContent = `было ${d.previous_posts_count} за пред. месяц`;
+    pD.className = 'delta neutral';
 }
+
+function renderWeeklyChart(trend) {
+    if (!trend || !trend.length) return;
+    const labels = trend.map(w => 'W' + w.week.split('W')[1]);
+    const values = trend.map(w => w.avg_views);
+    const colors = trend.map(w => w.vs_prev_week_pct >= 0 ? '#00b89488' : '#e1705588');
+
+    if (weeklyChart) weeklyChart.destroy();
+    weeklyChart = new Chart(document.getElementById('cWeekly').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{ data: values, backgroundColor: colors, borderRadius: 4 }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => {
+                            const w = trend[ctx.dataIndex];
+                            return `${w.posts_count} постов, avg ${w.avg_views} views`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { grid: { color: '#2e3348' }, ticks: { color: '#8b90a5', font: { size: 10 } } },
+                y: { grid: { color: '#2e3348' }, ticks: { color: '#8b90a5', font: { size: 10 } } }
+            }
+        }
+    });
+}
+
+function renderScorecard(scorecard) {
+    if (!scorecard || !scorecard.length) {
+        document.getElementById('scorecardTable').innerHTML = '<div class="empty-state">Нет данных за 2 недели</div>';
+        return;
+    }
+    let html = '<table><thead><tr><th>Тип</th><th>Постов</th><th>Avg views</th><th>vs канал</th></tr></thead><tbody>';
+    for (const s of scorecard) {
+        const cls = s.vs_channel_avg_pct > 0 ? 'cell-up' : s.vs_channel_avg_pct < -10 ? 'cell-down' : 'cell-neutral';
+        const sign = s.vs_channel_avg_pct > 0 ? '+' : '';
+        html += `<tr>
+            <td><span class="badge ${s.type}">${s.type_label}</span></td>
+            <td>${s.count}</td>
+            <td><strong>${s.avg_views}</strong></td>
+            <td class="${cls}">${sign}${s.vs_channel_avg_pct}%</td>
+        </tr>`;
+    }
+    html += '</tbody></table>';
+    document.getElementById('scorecardTable').innerHTML = html;
+}
+
+function renderRecentPosts(posts) {
+    if (!posts || !posts.length) {
+        document.getElementById('recentTable').innerHTML = '<div class="empty-state">Нет данных</div>';
+        return;
+    }
+    let html = '<table><thead><tr><th>Дата</th><th>Тип</th><th>Текст</th><th>Views</th><th>vs avg</th></tr></thead><tbody>';
+    for (const p of posts) {
+        const rowCls = p.vs_avg_pct > 0 ? 'good' : p.vs_avg_pct < -20 ? 'bad' : '';
+        const cellCls = p.vs_avg_pct > 0 ? 'cell-up' : p.vs_avg_pct < -20 ? 'cell-down' : 'cell-neutral';
+        const sign = p.vs_avg_pct > 0 ? '+' : '';
+        const date = new Date(p.date).toLocaleDateString('ru-RU', {day:'numeric', month:'short'});
+        const link = p.link ? `<a href="${p.link}" target="_blank">${p.text_preview}</a>` : p.text_preview;
+        html += `<tr class="post-row ${rowCls}">
+            <td>${date}</td>
+            <td><span class="badge ${p.type}">${p.type_label}</span></td>
+            <td class="text-preview">${link}</td>
+            <td><strong>${p.views.toLocaleString('ru-RU')}</strong></td>
+            <td class="${cellCls}">${sign}${p.vs_avg_pct}%</td>
+        </tr>`;
+    }
+    html += '</tbody></table>';
+    document.getElementById('recentTable').innerHTML = html;
+}
+
+function renderInsights(insights) {
+    if (!insights || !insights.length) {
+        document.getElementById('insightsList').innerHTML = '<div class="empty-state">Нет данных для выводов</div>';
+        return;
+    }
+    const arrows = { up: '&#x25B2;', down: '&#x25BC;', neutral: '&#x25CF;' };
+    const colors = { up: 'var(--green)', down: 'var(--red)', neutral: 'var(--text2)' };
+    document.getElementById('insightsList').innerHTML = insights.map(i =>
+        `<div class="insight-item">
+            <span class="insight-arrow" style="color:${colors[i.direction]}">${arrows[i.direction]}</span>
+            <span class="insight-text">${i.text}</span>
+        </div>`
+    ).join('');
+}
+
+/* ─── TGStat sidebar ─── */
+
+async function loadSidebar() {
+    try {
+        const snaps = await api('/api/snapshots?limit=100');
+        if (!snaps.length) return;
+        const la = snaps[0], pr = snaps.length > 1 ? snaps[1] : null;
+        setSide('sSubs', la.participants, pr?.participants);
+        setSide('sReach', la.avg_reach, pr?.avg_reach);
+        setSide('sERR', la.err_percent, pr?.err_percent, '%');
+        setSide('sCI', la.ci_index, pr?.ci_index);
+    } catch(e) { console.error('sidebar:', e); }
+}
+
+function setSide(id, val, prev, sfx = '') {
+    const el = document.getElementById(id);
+    const de = document.getElementById(id + 'D');
+    el.textContent = typeof val === 'number' ? (Number.isInteger(val) ? val.toLocaleString('ru-RU') : val.toFixed(1)) + sfx : '—';
+    if (de && prev != null && typeof val === 'number') {
+        const diff = val - prev;
+        const pct = prev ? ((diff/prev)*100).toFixed(1) : 0;
+        const sign = diff > 0 ? '+' : '';
+        de.textContent = `${sign}${Number.isInteger(diff)?diff.toLocaleString('ru-RU'):diff.toFixed(1)} (${sign}${pct}%)`;
+        de.className = 'delta ' + (diff > 0 ? 'up' : diff < 0 ? 'down' : '');
+    }
+}
+
+/* ─── Data collection ─── */
 
 async function scrapeFromBrowser(channel, days) {
     const clean = channel.replace('@', '');
@@ -367,21 +483,18 @@ async function scrapeFromBrowser(channel, days) {
 }
 
 async function collectAll() {
-    const days = getSelectedDays();
-    if (days === null) { alert('Введите количество дней'); return; }
     const btn = document.getElementById('collectBtn');
     btn.disabled = true;
-    const label = days === 0 ? 'все посты' : days + ' дн';
     btn.innerHTML = '<span class="loader"></span> Метрики...';
     let metricsOk = false;
     try { await api('/api/collect', { method: 'POST' }); metricsOk = true; } catch(e) { console.warn(e); }
-    btn.innerHTML = '<span class="loader"></span> Посты за ' + label + '...';
+    btn.innerHTML = '<span class="loader"></span> Посты...';
     let postsCount = 0;
-    try { const r = await api('/api/collect-history?days='+days, {method:'POST'}); postsCount = r.posts_collected; } catch(e) { console.warn(e); }
+    try { const r = await api('/api/collect-history?days=90', {method:'POST'}); postsCount = r.posts_collected; } catch(e) { console.warn(e); }
     if (postsCount === 0) {
         btn.innerHTML = '<span class="loader"></span> Скрейпинг...';
         try {
-            const posts = await scrapeFromBrowser('@mostcareer', days);
+            const posts = await scrapeFromBrowser('@mostcareer', 90);
             if (posts.length > 0) {
                 const up = await api('/api/upload-posts', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({posts}) });
                 postsCount = up.posts_uploaded;
@@ -394,200 +507,24 @@ async function collectAll() {
     if (!parts.length) parts.push('нет данных');
     btn.innerHTML = parts.join(' + ');
     setTimeout(() => { btn.innerHTML = 'Обновить данные'; btn.disabled = false; }, 3500);
-    checkHealth(); loadSnapshots(); loadPostingAnalysis(); loadPostTimeline(); loadPosts(); loadSmartCharts();
+    checkHealth(); loadDashboard(); loadSidebar();
 }
 
-async function loadSnapshots() {
-    try {
-        const snaps = await api('/api/snapshots?limit=100');
-        if (!snaps.length) return;
-        const la = snaps[0], pr = snaps.length > 1 ? snaps[1] : null;
-        setKPI('kSubs', la.participants, pr?.participants);
-        setKPI('kReach', la.avg_reach, pr?.avg_reach);
-        setKPI('kERR', la.err_percent, pr?.err_percent, '%');
-        setKPI('kDaily', la.daily_reach, pr?.daily_reach);
-        setKPI('kCI', la.ci_index, pr?.ci_index);
-    } catch(e) { console.error(e); }
-}
-function setKPI(id, val, prev, sfx = '') {
-    const el = document.getElementById(id);
-    const de = document.getElementById(id + 'D');
-    el.textContent = typeof val === 'number' ? (Number.isInteger(val) ? val.toLocaleString('ru-RU') : val.toFixed(1)) + sfx : '—';
-    if (de && prev != null && typeof val === 'number') {
-        const diff = val - prev;
-        const pct = prev ? ((diff/prev)*100).toFixed(1) : 0;
-        const sign = diff > 0 ? '+' : '';
-        de.textContent = `${sign}${Number.isInteger(diff)?diff.toLocaleString('ru-RU'):diff.toFixed(1)} (${sign}${pct}%)`;
-        de.className = 'delta ' + (diff > 0 ? 'up' : diff < 0 ? 'down' : '');
-    }
-}
-
-async function loadPostingAnalysis() {
-    try {
-        const pa = await api('/api/posting-analysis?days=180');
-
-        // Hours chart
-        const activeHours = pa.hours.filter(h => h.count > 0);
-        if (activeHours.length) {
-            const hLabels = activeHours.map(h => h.hour + ':00');
-            const hValues = activeHours.map(h => h.count);
-            const hColors = activeHours.map(h => h.hour === pa.peak_posting_hour ? '#e1705588' : '#6c5ce788');
-            mkChart('cHours', hLabels, hValues, '#6c5ce7', 'bar', hColors);
-        }
-
-        // Insights
-        const el = document.getElementById('insightsList');
-        const items = [];
-
-        items.push({ icon: '⏰', text: `Пик постинга: <strong>${pa.peak_posting_hour}:00 МСК</strong> (${pa.hours.find(h=>h.hour===pa.peak_posting_hour)?.count || 0} из ${pa.total_posts} постов). Лучший день: <strong>${pa.best_day}</strong> (avg ${pa.best_day_avg} views)` });
-
-        const worst = pa.days.reduce((a,b) => a.avg_views < b.avg_views ? a : b);
-        if (worst && pa.best_day) {
-            items.push({ icon: '📅', text: `${pa.best_day} даёт в среднем <strong>${pa.best_day_avg}</strong> просмотров, а ${worst.day} — только <strong>${worst.avg_views}</strong>. Разница ${Math.round((pa.best_day_avg - worst.avg_views) / worst.avg_views * 100)}%` });
-        }
-
-        if (pa.types.length) {
-            const best = pa.types[0];
-            const careerType = pa.types.find(t => t.type === 'career');
-            items.push({ icon: '📊', text: `Лучший тип по охвату: <strong>${{vacancy:'Вакансии',career:'Карьера',story:'Истории',announce:'Анонсы'}[best.type] || best.type}</strong> (avg ${best.avg_views} views). ${careerType ? `Карьерные посты: avg ${careerType.avg_views} views` : ''}` });
-        }
-
-        items.push({ icon: '📈', text: `Проанализировано: <strong>${pa.total_posts}</strong> постов за 6 месяцев` });
-
-        el.innerHTML = items.map(i =>
-            `<div style="display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--border);">
-                <span style="font-size:18px;flex-shrink:0;width:28px;text-align:center;">${i.icon}</span>
-                <span style="font-size:14px;line-height:1.5;">${i.text}</span>
-            </div>`
-        ).join('');
-    } catch(e) {
-        console.error('posting-analysis:', e);
-        document.getElementById('insightsList').innerHTML = '<p style="color:var(--text2)">Нажмите «Обновить данные» для загрузки аналитики</p>';
-    }
-}
-
-async function loadPostTimeline() {
-    try {
-        const data = await api('/api/posts-timeline');
-        if (!data.weekly || !data.weekly.length) return;
-        const w = data.weekly;
-        const wLabels = w.map(d => {
-            const parts = d.week.split('-W');
-            return 'W' + parts[1];
-        });
-        mkChart('cWeeklyPosts', wLabels, w.map(d => d.posts_count), '#00b894', 'bar');
-
-        if (data.monthly && data.monthly.length) {
-            const m = data.monthly;
-            const monthNames = {
-                '01':'Янв','02':'Фев','03':'Мар','04':'Апр','05':'Май','06':'Июн',
-                '07':'Июл','08':'Авг','09':'Сен','10':'Окт','11':'Ноя','12':'Дек'
-            };
-            const mLabels = m.map(d => {
-                const [y, mo] = d.month.split('-');
-                return (monthNames[mo]||mo) + ' ' + y.slice(2);
-            });
-            const mColors = m.map(d => {
-                const avg = d.avg_views;
-                return avg > 800 ? '#00b89488' : avg > 400 ? '#fdcb6e88' : '#e1705588';
-            });
-            mkChart('cMonthlyViews', mLabels, m.map(d => d.total_views), '#a29bfe', 'bar', mColors);
-        }
-    } catch(e) { console.error('postTimeline:', e); }
-}
-function mkChart(id, labels, values, color, type='line', customColors=null) {
-    if (charts[id]) charts[id].destroy();
-    const bgColor = customColors || (type==='bar' ? color+'88' : color+'20');
-    charts[id] = new Chart(document.getElementById(id).getContext('2d'), {
-        type, data: { labels, datasets: [{ data: values, borderColor: color, backgroundColor: bgColor, fill: type==='line' }] }, options: chartOpts
-    });
-}
-
-async function loadSmartCharts() {
-    try {
-        const mix = await api('/api/content-mix?days=120');
-        if (mix.length) {
-            const typeLabels = { vacancy:'Вакансии', career:'Карьера', story:'Истории', announce:'Анонсы' };
-            const typeColors = { vacancy:'#a29bfe', career:'#00b894', story:'#74b9ff', announce:'#fdcb6e' };
-            const labels = mix.map(m => typeLabels[m.type] || m.type);
-            const colors = mix.map(m => typeColors[m.type] || '#8b90a5');
-
-            if (charts.cMix) charts.cMix.destroy();
-            charts.cMix = new Chart(document.getElementById('cMix').getContext('2d'), {
-                type: 'bar', data: { labels, datasets: [{ data: mix.map(m => m.avg_views), backgroundColor: colors }] },
-                options: { ...chartOpts, plugins: { legend: { display: false } }, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, title: { display: true, text: 'Ср. просмотры', color: '#8b90a5', font: { size: 11 } } } } }
-            });
-
-        }
-
-        // Best day chart from posts
-        const posts = await api('/api/posts-classified?days=120');
-        if (posts.length) {
-            const dayNames = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
-            const dayData = Array(7).fill(null).map(() => []);
-            posts.forEach(p => {
-                if (p.date) { const d = new Date(p.date).getDay(); dayData[d].push(p.views); }
-            });
-            const dayLabels = [], dayAvgs = [], dayColors = [];
-            [1,2,3,4,5,6,0].forEach(d => {
-                if (dayData[d].length) {
-                    dayLabels.push(dayNames[d]);
-                    const avg = dayData[d].reduce((a,b)=>a+b,0)/dayData[d].length;
-                    dayAvgs.push(Math.round(avg));
-                    dayColors.push(d===4||d===5 ? '#00b89488' : '#74b9ff88');
-                }
-            });
-            if (charts.cDays) charts.cDays.destroy();
-            charts.cDays = new Chart(document.getElementById('cDays').getContext('2d'), {
-                type: 'bar', data: { labels: dayLabels, datasets: [{ data: dayAvgs, backgroundColor: dayColors }] },
-                options: { ...chartOpts, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, title: { display: true, text: 'Ср. просмотры', color: '#8b90a5', font: { size: 11 } } } } }
-            });
-        }
-    } catch(e) { console.error('smartCharts:', e); }
-}
-
-async function loadPosts() {
-    const days = document.getElementById('postsDays').value;
-    const sort = document.getElementById('postsSort').value;
-    try {
-        const posts = await api(`/api/posts-classified?days=${days}`);
-        if (!posts.length) { document.getElementById('postsTable').innerHTML = '<div class="empty-state"><p>Нет данных за период.</p></div>'; return; }
-        if (sort === 'views') posts.sort((a,b) => b.views - a.views);
-        let html = '<table><thead><tr><th>Дата</th><th>Тип</th><th>Текст</th><th>Просмотры</th><th>vs ср.</th><th>Ссылка</th></tr></thead><tbody>';
-        for (const p of posts) {
-            const date = p.date ? new Date(p.date).toLocaleDateString('ru-RU',{day:'numeric',month:'short'}) : '—';
-            const text = (p.text||'').substring(0,80) + ((p.text||'').length > 80 ? '...' : '');
-            const typeLabel = {vacancy:'Вакансия',career:'Карьера',story:'История',announce:'Анонс'}[p.type] || p.type;
-            const deltaClass = p.vs_avg > 20 ? 'up' : p.vs_avg < -20 ? 'down' : '';
-            const sign = p.vs_avg > 0 ? '+' : '';
-            html += `<tr>
-                <td>${date}</td>
-                <td><span class="badge ${p.type}">${typeLabel}</span></td>
-                <td class="text-preview" title="${(p.text||'').replace(/"/g,'&quot;')}">${text}</td>
-                <td><strong>${(p.views||0).toLocaleString('ru-RU')}</strong></td>
-                <td class="delta-cell ${deltaClass}">${sign}${p.vs_avg}%</td>
-                <td>${p.link ? `<a href="${p.link}" target="_blank">Открыть</a>` : '—'}</td>
-            </tr>`;
-        }
-        html += '</tbody></table>';
-        document.getElementById('postsTable').innerHTML = html;
-    } catch(e) { document.getElementById('postsTable').innerHTML = `<div class="empty-state"><p>Ошибка: ${e.message}</p></div>`; }
-}
+/* ─── GPT Analysis ─── */
 
 async function runAnalysis() {
     const btn = document.getElementById('analyzeBtn');
     const content = document.getElementById('analysisContent');
     const days = document.getElementById('analysisDays').value;
-    const depth = document.getElementById('analysisDepth').value;
     btn.disabled = true;
     btn.innerHTML = '<span class="loader"></span> Анализирую...';
-    content.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text2)"><span class="loader" style="width:24px;height:24px;border-width:3px;display:inline-block;margin-bottom:12px;"></span><br>GPT-4o анализирует данные...<br><span style="font-size:12px;">Глубокий анализ может занять до 2 минут</span></div>';
+    content.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text2)"><span class="loader" style="width:24px;height:24px;border-width:3px;display:inline-block;margin-bottom:12px;"></span><br>GPT-4o анализирует данные...</div>';
     try {
-        const res = await api(`/api/analyze?days=${days}&depth=${depth}`, { method: 'POST' });
+        const res = await api(`/api/analyze?days=${days}&depth=standard`, { method: 'POST' });
         content.innerHTML = marked.parse(res.analysis);
         loadAnalysisHistory();
     } catch(e) { content.innerHTML = `<div style="color:var(--red);padding:20px;">Ошибка: ${e.message}</div>`; }
-    btn.innerHTML = 'Запустить анализ'; btn.disabled = false;
+    btn.innerHTML = 'Спросить'; btn.disabled = false;
 }
 
 async function loadAnalysisHistory() {
@@ -597,12 +534,12 @@ async function loadAnalysisHistory() {
         if (!items.length) { el.innerHTML = '<div class="empty-state"><p>Анализы ещё не проводились.</p></div>'; return; }
         el.innerHTML = items.map(a => {
             const date = new Date(a.created_at).toLocaleString('ru-RU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-            const typeLabel = {standard:'Стандартный',deep:'Глубокий'}[a.analysis_type] || a.analysis_type;
             const preview = (a.gpt_response||'').substring(0,150)+'...';
-            return `<div class="history-item" onclick="showAnalysis(${a.id})"><div style="display:flex;justify-content:space-between;align-items:center;"><strong>${typeLabel} анализ</strong><span class="meta">${date}</span></div><div class="meta" style="margin-top:4px;">${preview}</div></div>`;
+            return `<div class="history-item" onclick="showAnalysis(${a.id})"><div style="display:flex;justify-content:space-between;"><strong>Анализ</strong><span class="meta">${date}</span></div><div class="meta" style="margin-top:4px;">${preview}</div></div>`;
         }).join('');
     } catch(e) { console.error(e); }
 }
+
 async function showAnalysis(id) {
     try {
         const items = await api('/api/analyses?limit=50');
@@ -616,30 +553,6 @@ async function showAnalysis(id) {
         }
     } catch(e) { console.error(e); }
 }
-
-let strategyLoaded = false;
-async function loadStrategyTab() {
-    if (strategyLoaded) return;
-    strategyLoaded = true;
-    try {
-        const data = await api('/api/strategy');
-        if (data.strategy) document.getElementById('strategyMd').innerHTML = marked.parse(data.strategy);
-        else document.getElementById('strategyMd').innerHTML = '<div class="empty-state">Стратегия ещё не создана.</div>';
-        if (data.audit) document.getElementById('auditMd').innerHTML = marked.parse(data.audit);
-        else document.getElementById('auditMd').innerHTML = '<div class="empty-state">Аудит ещё не проведён.</div>';
-    } catch(e) {
-        document.getElementById('strategyMd').innerHTML = '<div style="color:var(--red);">Ошибка: '+e.message+'</div>';
-    }
-}
-
-document.querySelectorAll('.strat-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        document.querySelectorAll('.strat-tab').forEach(t => { t.classList.remove('active'); t.style.color='var(--text2)'; t.style.borderBottomColor='transparent'; });
-        document.querySelectorAll('.strat-section').forEach(s => s.style.display='none');
-        tab.classList.add('active'); tab.style.color='var(--accent2)'; tab.style.borderBottomColor='var(--accent)';
-        document.getElementById('strat-'+tab.dataset.strat).style.display='block';
-    });
-});
 </script>
 </body>
 </html>

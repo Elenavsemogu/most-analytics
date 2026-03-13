@@ -989,6 +989,144 @@ def get_posting_analysis(days: int = 180):
     }
 
 
+# ── Dashboard Summary ────────────────────────────────────────────────
+
+def _parse_post_date(raw_date):
+    if isinstance(raw_date, datetime):
+        return raw_date
+    return datetime.fromisoformat(str(raw_date).replace("+00:00", "").replace("Z", ""))
+
+
+@app.get("/api/dashboard-summary", dependencies=[Depends(check_auth)])
+def get_dashboard_summary():
+    """All data for the main dashboard in one call."""
+    from collections import defaultdict
+
+    now = datetime.utcnow()
+    cutoff_180 = (now - timedelta(days=180)).strftime("%Y-%m-%d %H:%M:%S")
+
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT date, views, text, link FROM posts WHERE date >= ? AND date IS NOT NULL ORDER BY date DESC",
+            (cutoff_180,)
+        ).fetchall()
+
+    seen = set()
+    posts = []
+    for r in rows:
+        d = dict(r)
+        if not d.get("date"):
+            continue
+        key = str(d["date"])[:16]
+        if key in seen:
+            continue
+        seen.add(key)
+        d["_dt"] = _parse_post_date(d["date"])
+        d["_views"] = d.get("views") or 0
+        d["_type"] = classify_post(d.get("text") or "")
+        posts.append(d)
+
+    current_posts = [p for p in posts if (now - p["_dt"]).days <= 14]
+    previous_posts = [p for p in posts if 14 < (now - p["_dt"]).days <= 45]
+
+    current_avg = round(sum(p["_views"] for p in current_posts) / len(current_posts)) if current_posts else 0
+    previous_avg = round(sum(p["_views"] for p in previous_posts) / len(previous_posts)) if previous_posts else 0
+    delta_pct = round((current_avg - previous_avg) / previous_avg * 100) if previous_avg else 0
+
+    # Weekly trend (last 12 weeks)
+    weeks = defaultdict(lambda: {"views": [], "count": 0})
+    for p in posts:
+        wk = p["_dt"].strftime("%Y-W%W")
+        weeks[wk]["views"].append(p["_views"])
+        weeks[wk]["count"] += 1
+
+    sorted_weeks = sorted(weeks.keys())[-12:]
+    weekly_trend = []
+    prev_avg_wk = None
+    for wk in sorted_weeks:
+        w = weeks[wk]
+        avg = round(sum(w["views"]) / len(w["views"])) if w["views"] else 0
+        vs_prev = round((avg - prev_avg_wk) / prev_avg_wk * 100) if prev_avg_wk else 0
+        weekly_trend.append({
+            "week": wk,
+            "avg_views": avg,
+            "posts_count": w["count"],
+            "vs_prev_week_pct": vs_prev,
+        })
+        prev_avg_wk = avg if avg > 0 else prev_avg_wk
+
+    # Type scorecard (based on last 14 days)
+    type_data = defaultdict(list)
+    for p in current_posts:
+        type_data[p["_type"]].append(p["_views"])
+
+    type_labels = {"vacancy": "Вакансии", "career": "Карьера", "story": "Истории", "announce": "Анонсы"}
+    type_scorecard = []
+    for t, views_list in type_data.items():
+        avg = round(sum(views_list) / len(views_list)) if views_list else 0
+        vs_avg = round((avg - current_avg) / current_avg * 100) if current_avg else 0
+        type_scorecard.append({
+            "type": t,
+            "type_label": type_labels.get(t, t),
+            "count": len(views_list),
+            "avg_views": avg,
+            "vs_channel_avg_pct": vs_avg,
+        })
+    type_scorecard.sort(key=lambda x: -x["vs_channel_avg_pct"])
+
+    # Recent posts (last 15)
+    recent = posts[:15]
+    recent_posts = []
+    for p in recent:
+        vs_avg = round((p["_views"] - current_avg) / current_avg * 100) if current_avg else 0
+        text_raw = (p.get("text") or "").replace("<b>", "").replace("</b>", "").replace("<blockquote>", "").replace("</blockquote>", "").replace("\n", " ")
+        recent_posts.append({
+            "date": p["_dt"].strftime("%Y-%m-%d"),
+            "text_preview": text_raw[:60] + ("..." if len(text_raw) > 60 else ""),
+            "views": p["_views"],
+            "type": p["_type"],
+            "type_label": type_labels.get(p["_type"], p["_type"]),
+            "vs_avg_pct": vs_avg,
+            "link": p.get("link") or "",
+        })
+
+    # Insights
+    insights = []
+    if previous_avg and current_avg:
+        direction = "снижается" if delta_pct < -5 else "растёт" if delta_pct > 5 else "стабилен"
+        insights.append({
+            "direction": "down" if delta_pct < -5 else "up" if delta_pct > 5 else "neutral",
+            "text": f"Охват: {current_avg} avg/post (было {previous_avg}, {'+' if delta_pct > 0 else ''}{delta_pct}%) — {direction}",
+        })
+
+    if type_scorecard:
+        best = type_scorecard[0]
+        if best["vs_channel_avg_pct"] > 0:
+            insights.append({
+                "direction": "up",
+                "text": f"{best['type_label']} — лучший тип: +{best['vs_channel_avg_pct']}% к среднему канала ({best['avg_views']} avg views)",
+            })
+        worst = type_scorecard[-1]
+        if worst["vs_channel_avg_pct"] < -10:
+            insights.append({
+                "direction": "down",
+                "text": f"{worst['type_label']} — ниже среднего: {worst['vs_channel_avg_pct']}% ({worst['avg_views']} avg views)",
+            })
+
+    return {
+        "current_avg": current_avg,
+        "previous_avg": previous_avg,
+        "delta_pct": delta_pct,
+        "current_posts_count": len(current_posts),
+        "previous_posts_count": len(previous_posts),
+        "best_type": type_scorecard[0] if type_scorecard else None,
+        "weekly_trend": weekly_trend,
+        "type_scorecard": type_scorecard,
+        "recent_posts": recent_posts,
+        "insights": insights,
+    }
+
+
 # ── Cron (daily auto-collect) ────────────────────────────────────────
 
 @app.post("/api/cron/daily")
