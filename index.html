@@ -54,15 +54,6 @@
         .chart-box h3 { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text2); }
         .chart-wrap { position: relative; height: 240px; }
 
-        /* Main + sidebar layout */
-        .main-layout { display: grid; grid-template-columns: 1fr 260px; gap: 16px; margin-bottom: 24px; }
-        @media (max-width: 1100px) { .main-layout { grid-template-columns: 1fr; } }
-        .main-col { display: flex; flex-direction: column; gap: 16px; }
-        .main-col .charts-grid { margin-bottom: 0; }
-        .side-col { display: flex; flex-direction: column; gap: 12px; }
-        .chart-wrap-sm { position: relative; height: 140px; }
-        .side-chart { padding: 12px; }
-        .side-chart h3 { font-size: 12px; margin-bottom: 6px; }
 
         /* Tabs */
         .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
@@ -154,28 +145,17 @@
         <div class="kpi"><div class="label">CI индекс</div><div class="value" id="kCI">—</div><div class="delta" id="kCID"></div><div class="kpi-hint">Цитируемость. Как часто канал упоминают и пересылают</div></div>
     </div>
 
-    <!-- Main layout: posting analysis (big) + TGStat sidebar -->
-    <div class="main-layout">
-        <div class="main-col">
-            <div class="charts-grid">
-                <div class="chart-box"><h3>⏰ Время постинга (МСК)</h3><div class="chart-wrap"><canvas id="cHours"></canvas></div></div>
-                <div class="chart-box"><h3>📅 Лучший день публикации</h3><div class="chart-wrap"><canvas id="cDays"></canvas></div></div>
-            </div>
-            <div class="charts-grid">
-                <div class="chart-box"><h3>📊 Охват по типу контента</h3><div class="chart-wrap"><canvas id="cMix"></canvas></div></div>
-                <div class="chart-box"><h3>🎯 Контент-микс: факт vs стратегия</h3><div class="chart-wrap"><canvas id="cStrategy"></canvas></div></div>
-            </div>
-            <div class="charts-grid" id="postCharts" style="display:none;">
-                <div class="chart-box"><h3>📝 Постов в неделю</h3><div class="chart-wrap"><canvas id="cWeeklyPosts"></canvas></div></div>
-                <div class="chart-box"><h3>📅 Просмотры по месяцам</h3><div class="chart-wrap"><canvas id="cMonthlyViews"></canvas></div></div>
-            </div>
-        </div>
-        <div class="side-col" id="tgstatSidebar">
-            <div class="chart-box side-chart"><h3>👥 Подписчики</h3><div class="chart-wrap-sm"><canvas id="cSubsHistory"></canvas></div></div>
-            <div class="chart-box side-chart"><h3>👁 Просмотры</h3><div class="chart-wrap-sm"><canvas id="cViewsHistory"></canvas></div></div>
-            <div class="chart-box side-chart"><h3>📈 Охват</h3><div class="chart-wrap-sm"><canvas id="cReachHistory"></canvas></div></div>
-            <div class="chart-box side-chart"><h3>📉 ERR %</h3><div class="chart-wrap-sm"><canvas id="cErrHistory"></canvas></div></div>
-        </div>
+    <!-- Charts -->
+    <div class="charts-grid">
+        <div class="chart-box"><h3>⏰ Время постинга (МСК)</h3><div class="chart-wrap"><canvas id="cHours"></canvas></div></div>
+        <div class="chart-box"><h3>📅 Лучший день публикации</h3><div class="chart-wrap"><canvas id="cDays"></canvas></div></div>
+    </div>
+    <div class="charts-grid">
+        <div class="chart-box"><h3>📊 Охват по типу контента</h3><div class="chart-wrap"><canvas id="cMix"></canvas></div></div>
+        <div class="chart-box"><h3>📝 Постов в неделю</h3><div class="chart-wrap"><canvas id="cWeeklyPosts"></canvas></div></div>
+    </div>
+    <div class="charts-grid">
+        <div class="chart-box"><h3>📅 Просмотры по месяцам</h3><div class="chart-wrap"><canvas id="cMonthlyViews"></canvas></div></div>
     </div>
 
     <!-- Insights block -->
@@ -298,7 +278,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     checkHealth();
     loadSnapshots();
-    loadTGStatHistory();
     loadPostingAnalysis();
     loadPostTimeline();
     loadPosts();
@@ -415,7 +394,7 @@ async function collectAll() {
     if (!parts.length) parts.push('нет данных');
     btn.innerHTML = parts.join(' + ');
     setTimeout(() => { btn.innerHTML = 'Обновить данные'; btn.disabled = false; }, 3500);
-    checkHealth(); loadSnapshots(); loadTGStatHistory(); loadPostingAnalysis(); loadPostTimeline(); loadPosts(); loadSmartCharts();
+    checkHealth(); loadSnapshots(); loadPostingAnalysis(); loadPostTimeline(); loadPosts(); loadSmartCharts();
 }
 
 async function loadSnapshots() {
@@ -440,51 +419,6 @@ function setKPI(id, val, prev, sfx = '') {
         const sign = diff > 0 ? '+' : '';
         de.textContent = `${sign}${Number.isInteger(diff)?diff.toLocaleString('ru-RU'):diff.toFixed(1)} (${sign}${pct}%)`;
         de.className = 'delta ' + (diff > 0 ? 'up' : diff < 0 ? 'down' : '');
-    }
-}
-
-async function loadTGStatHistory() {
-    try {
-        const data = await api('/api/tgstat-history');
-
-        function parseTimeSeries(raw) {
-            if (!raw || raw.error || !Array.isArray(raw)) return { labels: [], values: [] };
-            const labels = [], values = [];
-            for (const item of raw) {
-                const d = item.date || item.period;
-                const v = item.subscribers_count ?? item.views_count ?? item.avg_post_reach ?? item.err ?? item.value ?? item.count ?? 0;
-                if (d) {
-                    const dt = new Date(typeof d === 'number' ? d * 1000 : d);
-                    labels.push(dt.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }));
-                    values.push(typeof v === 'number' ? v : parseFloat(v) || 0);
-                }
-            }
-            return { labels, values };
-        }
-
-        const subs = parseTimeSeries(data.subscribers);
-        const views = parseTimeSeries(data.views);
-        const reach = parseTimeSeries(data.avg_reach);
-        const err = parseTimeSeries(data.err);
-
-        if (subs.values.length > 1) mkChart('cSubsHistory', subs.labels, subs.values, '#6c5ce7');
-        if (views.values.length > 1) mkChart('cViewsHistory', views.labels, views.values, '#74b9ff', 'bar');
-        if (reach.values.length > 1) mkChart('cReachHistory', reach.labels, reach.values, '#a29bfe');
-        if (err.values.length > 1) mkChart('cErrHistory', err.labels, err.values, '#00b894');
-
-    } catch (e) {
-        console.error('tgstat-history:', e);
-        // fallback to old metrics endpoint
-        try {
-            const data = await api('/api/metrics');
-            if (data.length >= 2) {
-                const labels = data.map(d => new Date(d.collected_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }));
-                mkChart('cSubsHistory', labels, data.map(d => d.participants), '#6c5ce7');
-                mkChart('cErrHistory', labels, data.map(d => d.err_percent), '#00b894');
-                mkChart('cReachHistory', labels, data.map(d => d.avg_reach), '#a29bfe');
-                mkChart('cViewsHistory', labels, data.map(d => d.daily_reach), '#74b9ff', 'bar');
-            }
-        } catch (e2) { console.error(e2); }
     }
 }
 
@@ -536,7 +470,6 @@ async function loadPostTimeline() {
     try {
         const data = await api('/api/posts-timeline');
         if (!data.weekly || !data.weekly.length) return;
-        document.getElementById('postCharts').style.display = 'grid';
         const w = data.weekly;
         const wLabels = w.map(d => {
             const parts = d.week.split('-W');
@@ -585,21 +518,6 @@ async function loadSmartCharts() {
                 options: { ...chartOpts, plugins: { legend: { display: false } }, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, title: { display: true, text: 'Ср. просмотры', color: '#8b90a5', font: { size: 11 } } } } }
             });
 
-            // Strategy comparison
-            const stratTarget = { career: 65, story: 35, vacancy: 0, announce: 0 };
-            const totalPosts = mix.reduce((s, m) => s + m.count, 0);
-            const factPcts = {};
-            mix.forEach(m => { factPcts[m.type] = totalPosts ? Math.round(m.count / totalPosts * 100) : 0; });
-            const types = ['vacancy','career','story','announce'];
-            const tLabels = types.map(t => typeLabels[t] || t);
-
-            if (charts.cStrategy) charts.cStrategy.destroy();
-            charts.cStrategy = new Chart(document.getElementById('cStrategy').getContext('2d'), {
-                type: 'bar', data: { labels: tLabels, datasets: [
-                    { label: 'Факт', data: types.map(t => factPcts[t] || 0), backgroundColor: '#6c5ce788' },
-                    { label: 'Стратегия', data: types.map(t => stratTarget[t] || 0), backgroundColor: '#00b89488' }
-                ]}, options: { ...chartOpts, plugins: { legend: { display: true, labels: { color: '#8b90a5', font: { size: 11 } } } }, scales: { ...chartOpts.scales, y: { ...chartOpts.scales.y, title: { display: true, text: '%', color: '#8b90a5', font: { size: 11 } } } } }
-            });
         }
 
         // Best day chart from posts
