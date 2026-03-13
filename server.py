@@ -907,6 +907,14 @@ def get_content_mix(days: int = 30):
 @app.get("/api/posting-analysis", dependencies=[Depends(check_auth)])
 def get_posting_analysis(days: int = 180):
     """Real posting time analysis: hours (MSK), days, type performance."""
+    import traceback
+    from collections import defaultdict, Counter
+    try:
+        return _posting_analysis_impl(days)
+    except Exception as e:
+        raise HTTPException(500, f"{e.__class__.__name__}: {e}\n{traceback.format_exc()}")
+
+def _posting_analysis_impl(days: int):
     from collections import defaultdict, Counter
     cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
     with get_db() as conn:
