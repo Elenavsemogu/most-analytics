@@ -907,19 +907,11 @@ def get_content_mix(days: int = 30):
 @app.get("/api/posting-analysis", dependencies=[Depends(check_auth)])
 def get_posting_analysis(days: int = 180):
     """Real posting time analysis: hours (MSK), days, type performance."""
-    import traceback
     from collections import defaultdict, Counter
-    try:
-        return _posting_analysis_impl(days)
-    except Exception as e:
-        raise HTTPException(500, f"{e.__class__.__name__}: {e}\n{traceback.format_exc()}")
-
-def _posting_analysis_impl(days: int):
-    from collections import defaultdict, Counter
-    cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+    cutoff = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT date, views, text FROM posts WHERE date >= ? AND date != '' ORDER BY date ASC",
+            "SELECT date, views, text FROM posts WHERE date >= ? AND date IS NOT NULL ORDER BY date ASC",
             (cutoff,)
         ).fetchall()
 
@@ -929,7 +921,7 @@ def _posting_analysis_impl(days: int):
         d = dict(r)
         if not d.get("date"):
             continue
-        date_key = d["date"][:16]
+        date_key = str(d["date"])[:16]
         if date_key in seen_links:
             continue
         seen_links.add(date_key)
@@ -942,15 +934,19 @@ def _posting_analysis_impl(days: int):
 
     for p in posts:
         try:
-            dt = datetime.fromisoformat(p["date"].replace("+00:00", "").replace("Z", ""))
+            raw_date = p["date"]
+            if isinstance(raw_date, datetime):
+                dt = raw_date
+            else:
+                dt = datetime.fromisoformat(str(raw_date).replace("+00:00", "").replace("Z", ""))
             msk_hour = (dt.hour + 3) % 24
             hours[msk_hour] += 1
             wd = dt.weekday()
-            day_views[wd].append(p.get("views", 0))
+            day_views[wd].append(p.get("views") or 0)
         except Exception:
             pass
-        ptype = classify_post(p.get("text", ""))
-        type_views[ptype].append(p.get("views", 0))
+        ptype = classify_post(p.get("text") or "")
+        type_views[ptype].append(p.get("views") or 0)
 
     hours_data = [{"hour": h, "count": hours.get(h, 0)} for h in range(24)]
 
