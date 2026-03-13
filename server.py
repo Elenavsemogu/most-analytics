@@ -992,8 +992,9 @@ def get_posting_analysis(days: int = 180):
 # ── Dashboard Summary ────────────────────────────────────────────────
 
 def _parse_post_date(raw_date):
+    """Parse date from DB row, always return naive UTC datetime."""
     if isinstance(raw_date, datetime):
-        return raw_date
+        return raw_date.replace(tzinfo=None)
     return datetime.fromisoformat(str(raw_date).replace("+00:00", "").replace("Z", ""))
 
 
