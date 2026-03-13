@@ -127,7 +127,7 @@
             <div class="subtitle" id="channelName">@mostcareer</div>
         </div>
         <div class="actions">
-            <button class="btn primary" onclick="collectAll()" id="collectBtn">Obновить данные</button>
+            <button class="btn primary" onclick="collectAll()" id="collectBtn">Обновить данные</button>
             <a class="btn" href="/api/export/csv?days=90" target="_blank">CSV</a>
             <a class="btn" href="/api/export/report?days=30" target="_blank">Отчёт</a>
         </div>
@@ -144,7 +144,7 @@
             <!-- KPI cards -->
             <div class="kpi-row">
                 <div class="kpi">
-                    <div class="label">Avg views / post</div>
+                    <div class="label">Ср. просмотры / пост</div>
                     <div class="value" id="kAvg">—</div>
                     <div class="delta" id="kAvgD">за последние 2 недели</div>
                 </div>
@@ -162,7 +162,7 @@
 
             <!-- Weekly trend chart -->
             <div class="chart-box">
-                <h3>Avg views/post по неделям</h3>
+                <h3>Ср. просмотры на пост по неделям</h3>
                 <div class="chart-wrap"><canvas id="cWeekly"></canvas></div>
             </div>
 
@@ -318,13 +318,13 @@ function renderKPI(d) {
     document.getElementById('kAvg').textContent = d.current_avg;
     const dEl = document.getElementById('kAvgD');
     const sign = d.delta_pct > 0 ? '+' : '';
-    dEl.textContent = `${sign}${d.delta_pct}% vs пред. месяц (было ${d.previous_avg})`;
+    dEl.textContent = `${sign}${d.delta_pct}% vs пред. месяц (было ${d.previous_avg} просм.)`;
     dEl.className = 'delta ' + (d.delta_pct > 5 ? 'up' : d.delta_pct < -5 ? 'down' : 'neutral');
 
     if (d.best_type) {
         document.getElementById('kBestType').textContent = d.best_type.type_label;
         const btD = document.getElementById('kBestTypeD');
-        btD.textContent = `+${d.best_type.vs_channel_avg_pct}% к среднему (${d.best_type.avg_views} avg)`;
+        btD.textContent = `+${d.best_type.vs_channel_avg_pct}% к среднему (${d.best_type.avg_views} просм.)`;
         btD.className = 'delta up';
     }
 
@@ -355,7 +355,7 @@ function renderWeeklyChart(trend) {
                     callbacks: {
                         label: (ctx) => {
                             const w = trend[ctx.dataIndex];
-                            return `${w.posts_count} постов, avg ${w.avg_views} views`;
+                            return `${w.posts_count} постов, ср. ${w.avg_views} просм.`;
                         }
                     }
                 }
@@ -373,7 +373,7 @@ function renderScorecard(scorecard) {
         document.getElementById('scorecardTable').innerHTML = '<div class="empty-state">Нет данных за 2 недели</div>';
         return;
     }
-    let html = '<table><thead><tr><th>Тип</th><th>Постов</th><th>Avg views</th><th>vs канал</th></tr></thead><tbody>';
+    let html = '<table><thead><tr><th>Тип</th><th>Постов</th><th>Ср. просмотры</th><th>vs канал</th></tr></thead><tbody>';
     for (const s of scorecard) {
         const cls = s.vs_channel_avg_pct > 0 ? 'cell-up' : s.vs_channel_avg_pct < -10 ? 'cell-down' : 'cell-neutral';
         const sign = s.vs_channel_avg_pct > 0 ? '+' : '';

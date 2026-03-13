@@ -1068,7 +1068,7 @@ def _dashboard_summary_impl():
     for p in current_posts:
         type_data[p["_type"]].append(p["_views"])
 
-    type_labels = {"vacancy": "Вакансии", "career": "Карьера", "story": "Истории", "announce": "Анонсы"}
+    type_labels = {"vacancy": "Вакансии", "career": "Карьера", "story": "Истории", "announce": "Новости/события"}
     type_scorecard = []
     for t, views_list in type_data.items():
         avg = round(sum(views_list) / len(views_list)) if views_list else 0
@@ -1104,7 +1104,7 @@ def _dashboard_summary_impl():
         direction = "снижается" if delta_pct < -5 else "растёт" if delta_pct > 5 else "стабилен"
         insights.append({
             "direction": "down" if delta_pct < -5 else "up" if delta_pct > 5 else "neutral",
-            "text": f"Охват: {current_avg} avg/post (было {previous_avg}, {'+' if delta_pct > 0 else ''}{delta_pct}%) — {direction}",
+            "text": f"Охват: {current_avg} просм./пост (было {previous_avg}, {'+' if delta_pct > 0 else ''}{delta_pct}%) — {direction}",
         })
 
     if type_scorecard:
@@ -1112,13 +1112,13 @@ def _dashboard_summary_impl():
         if best["vs_channel_avg_pct"] > 0:
             insights.append({
                 "direction": "up",
-                "text": f"{best['type_label']} — лучший тип: +{best['vs_channel_avg_pct']}% к среднему канала ({best['avg_views']} avg views)",
+                "text": f"{best['type_label']} — лучший тип: +{best['vs_channel_avg_pct']}% к среднему канала ({best['avg_views']} просм./пост)",
             })
         worst = type_scorecard[-1]
         if worst["vs_channel_avg_pct"] < -10:
             insights.append({
                 "direction": "down",
-                "text": f"{worst['type_label']} — ниже среднего: {worst['vs_channel_avg_pct']}% ({worst['avg_views']} avg views)",
+                "text": f"{worst['type_label']} — ниже среднего: {worst['vs_channel_avg_pct']}% ({worst['avg_views']} просм./пост)",
             })
 
     return {
